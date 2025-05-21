@@ -18,21 +18,52 @@
             {% endif %}
         {% endwith %}
 
-        <h2>Upload New Meeting Audio</h2>
-        <form method="POST" enctype="multipart/form-data">
-            <input type="file" name="audio_file" accept=".mp3,.wav,.m4a,.mp4,.ogg,.flac" required>
-            <button type="submit">Upload and Process</button>
-        </form>
-        <p><small>Supported formats: mp3, wav, m4a, mp4, ogg, flac. Max size: 50MB.</small></p>
-        <p><small>Processing can take time, especially for long audio files.</small></p>
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'uploadTab')">Upload Audio File</button>
+            <button class="tab-button" onclick="openTab(event, 'recordTab')">Record Live Meeting</button>
+        </div>
+
+        <!-- Upload Audio File Tab -->
+        <div id="uploadTab" class="tab-content" style="display:block;">
+            <h2>Upload New Meeting Audio</h2>
+            <form method="POST" action="{{ url_for('index') }}" enctype="multipart/form-data" id="uploadForm">
+                <input type="file" name="audio_file" accept=".mp3,.wav,.m4a,.mp4,.ogg,.flac,.webm" required>
+                <button type="submit" id="uploadButton">Upload and Process</button>
+                <span id="uploadLoadingSpinner" class="loading-spinner" style="display:none;">
+                    <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." width="30" height="30"> Processing...
+                </span>
+            </form>
+            <p><small>Supported formats: mp3, wav, m4a, mp4, ogg, flac, webm. Max size: 100MB.</small></p>
+            <p><small>Processing can take time, especially for long audio files. Please be patient.</small></p>
+        </div>
+
+        <!-- Record Live Meeting Tab -->
+        <div id="recordTab" class="tab-content" style="display:none;">
+            <h2>Record Live Meeting</h2>
+            <div id="recorderControls">
+                <button id="startButton" class="button-record">Start Recording</button>
+                <button id="stopButton" class="button-stop" disabled>Stop Recording</button>
+                <button id="processRecordingButton" class="button-process" disabled>Process Recording</button>
+                <span id="timer" style="margin-left: 10px;">00:00</span>
+                 <span id="recordLoadingSpinner" class="loading-spinner" style="display:none;">
+                    <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." width="30" height="30"> Processing...
+                </span>
+            </div>
+            <div id="recordingStatus" style="margin-top:10px;">Status: Idle</div>
+            <audio id="audioPlayback" controls style="display:none; margin-top:10px; width:100%;"></audio>
+            <p id="recordingError" style="color:red;"></p>
+            <p><small>Ensure your microphone is enabled and permissions are granted.</small></p>
+            <p><small>When finished, click "Stop Recording", then "Process Recording".</small></p>
+        </div>
+
 
         <h2>Processed Meetings</h2>
         {% if meetings %}
         <table>
             <thead>
                 <tr>
-                    <th>Filename</th>
-                    <th>Uploaded At</th>
+                    <th>Filename/Title</th>
+                    <th>Uploaded/Recorded At</th>
                     <th>Status</th>
                     <th>Summary Snippet</th>
                     <th>Actions</th>
@@ -44,16 +75,17 @@
                     <td>{{ meeting.filename }}</td>
                     <td>{{ meeting.upload_time.strftime('%Y-%m-%d %H:%M') if meeting.upload_time else 'N/A' }}</td>
                     <td>
-                        <span class="status status-{{ meeting.processing_status.replace(' ', '-') }}">{{ meeting.processing_status }}</span>
+                        <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">{{ meeting.processing_status }}</span>
                     </td>
                     <td>{{ (meeting.summary[:100] + '...') if meeting.summary and meeting.summary|length > 100 else meeting.summary }}</td>
                     <td>
                         {% if meeting.processing_status == 'completed' %}
                             <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button">View Details</a>
                         {% elif meeting.processing_status == 'error' %}
-                            <span>Error</span>
+                            <span class="status status-error">Error</span>
+                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-info">View Error</a>
                         {% else %}
-                            <span>Processing...</span>
+                            <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">Processing...</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -64,5 +96,176 @@
         <p>No meetings processed yet.</p>
         {% endif %}
     </div>
+
+<script>
+    // Tab functionality
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tab-button");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    // Upload form spinner
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function() {
+            document.getElementById('uploadButton').style.display = 'none';
+            document.getElementById('uploadLoadingSpinner').style.display = 'inline-block';
+        });
+    }
+
+
+    // Recorder functionality
+    const startButton = document.getElementById('startButton');
+    const stopButton = document.getElementById('stopButton');
+    const processRecordingButton = document.getElementById('processRecordingButton');
+    const audioPlayback = document.getElementById('audioPlayback');
+    const recordingStatus = document.getElementById('recordingStatus');
+    const recordingError = document.getElementById('recordingError');
+    const timerDisplay = document.getElementById('timer');
+    const recordLoadingSpinner = document.getElementById('recordLoadingSpinner');
+
+    let mediaRecorder;
+    let audioChunks = [];
+    let audioBlob = null;
+    let timerInterval;
+    let secondsElapsed = 0;
+
+    if (startButton) { // Ensure elements exist before adding listeners
+        startButton.onclick = async () => {
+            recordingError.textContent = '';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // or audio/wav
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    audioPlayback.style.display = 'block';
+                    processRecordingButton.disabled = false;
+                    recordingStatus.textContent = 'Status: Recording stopped. Ready to process or re-record.';
+                    audioChunks = []; // Reset for next recording
+                    stopTimer();
+                };
+
+                mediaRecorder.start();
+                recordingStatus.textContent = 'Status: Recording...';
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                processRecordingButton.disabled = true;
+                audioPlayback.style.display = 'none';
+                startTimer();
+
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                recordingStatus.textContent = 'Status: Error accessing microphone.';
+                recordingError.textContent = 'Could not access microphone. Please ensure permission is granted and try again. Error: ' + err.message;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                processRecordingButton.disabled = true;
+            }
+        };
+
+        stopButton.onclick = () => {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                // The onstop event will handle the rest
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                // processRecordingButton will be enabled in onstop
+            }
+        };
+
+        processRecordingButton.onclick = async () => {
+            if (!audioBlob) {
+                recordingError.textContent = 'No recording available to process.';
+                return;
+            }
+
+            processRecordingButton.disabled = true;
+            startButton.disabled = true; // Prevent re-recording while processing
+            stopButton.disabled = true;
+            recordLoadingSpinner.style.display = 'inline-block';
+            recordingStatus.textContent = 'Status: Processing recording...';
+
+
+            const formData = new FormData();
+            const timestamp = new Date().toISOString().replace(/[-:.]/g, "").slice(0, -4); // YYYYMMDDTHHMMSS
+            const recordingFilename = `live_recording_${timestamp}.webm`;
+            formData.append('audio_file', audioBlob, recordingFilename);
+
+            try {
+                const response = await fetch("{{ url_for('process_recorded_audio') }}", {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.status === 'success' && result.meeting_id) {
+                        // Redirect to meeting detail page
+                        window.location.href = result.redirect_url;
+                    } else {
+                        recordingError.textContent = 'Error processing recording: ' + (result.message || 'Unknown server error.');
+                        recordingStatus.textContent = 'Status: Processing failed.';
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('Server error:', response.status, errorText);
+                    recordingError.textContent = `Server error: ${response.status}. Please check console or server logs.`;
+                    recordingStatus.textContent = 'Status: Processing failed.';
+                }
+            } catch (err) {
+                console.error('Error sending recording to server:', err);
+                recordingError.textContent = 'Network error or server unavailable while sending recording.';
+                recordingStatus.textContent = 'Status: Processing failed.';
+            } finally {
+                processRecordingButton.disabled = false; // Re-enable unless redirected
+                startButton.disabled = false;
+                recordLoadingSpinner.style.display = 'none';
+                // If not redirected, user might want to re-process or re-record
+                if (recordingStatus.textContent.includes('Processing failed')) {
+                     processRecordingButton.disabled = (audioBlob === null); // Only enable if there's still a blob
+                } else {
+                     // Successfully processed and redirected, or some other state
+                }
+
+            }
+        };
+    }
+
+    function startTimer() {
+        secondsElapsed = 0;
+        timerDisplay.textContent = formatTime(secondsElapsed);
+        timerInterval = setInterval(() => {
+            secondsElapsed++;
+            timerDisplay.textContent = formatTime(secondsElapsed);
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+    }
+
+    function formatTime(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+</script>
 </body>
 </html>

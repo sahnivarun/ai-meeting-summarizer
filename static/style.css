@@ -172,3 +172,97 @@ details summary:hover {
 .status-uploaded { background-color: #17a2b8; }
 .status-transcribing { background-color: #007bff; }
 .status-processing-nlp { background-color: #6f42c1; } /* Purple for NLP */
+
+/* static/style.css */
+/* ... (all your existing styles) ... */
+
+/* Tabs */
+.tabs {
+    overflow: hidden;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    background-color: #f1f1f1;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 14px 16px;
+    transition: 0.3s;
+    font-size: 1em;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    margin-right: 2px;
+}
+
+.tab-button:hover {
+    background-color: #ddd;
+}
+
+.tab-button.active {
+    background-color: #ccc;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+    padding: 15px 12px;
+    border-top: none;
+    animation: fadeEffect 0.5s; /* Fading effect for tabs */
+}
+
+@keyframes fadeEffect {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}
+
+/* Recorder Buttons */
+.button-record {
+    background-color: #dc3545; /* Red */
+    color: white;
+}
+.button-record:hover {
+    background-color: #c82333;
+}
+.button-record:disabled {
+    background-color: #f8d7da;
+    color: #721c24;
+    cursor: not-allowed;
+}
+
+.button-stop {
+    background-color: #ffc107; /* Yellow/Orange */
+    color: #212529;
+}
+.button-stop:hover {
+    background-color: #e0a800;
+}
+.button-stop:disabled {
+    background-color: #fff3cd;
+    color: #856404;
+    cursor: not-allowed;
+}
+
+.button-process {
+    background-color: #28a745; /* Green */
+    color: white;
+}
+.button-process:hover {
+    background-color: #218838;
+}
+.button-process:disabled {
+    background-color: #d4edda;
+    color: #155724;
+    cursor: not-allowed;
+}
+
+.loading-spinner {
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+#recorderControls button {
+    margin-right: 5px;
+}
