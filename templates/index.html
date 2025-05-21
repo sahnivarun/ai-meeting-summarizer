@@ -27,7 +27,6 @@
         </div>
 
         <!-- Upload Audio File Tab -->
-        <!-- ... (content same as your last complete version) ... -->
         <div id="uploadTab" class="tab-content" style="display:block;">
             <h2>Upload New Meeting Audio</h2>
             <form method="POST" action="{{ url_for('index') }}" enctype="multipart/form-data" id="uploadForm">
@@ -41,9 +40,7 @@
             <p><small>Processing can take time, especially for long audio files. Please be patient.</small></p>
         </div>
 
-
         <!-- Record Live Meeting Tab -->
-        <!-- ... (content same as your last complete version, including the live results display) ... -->
         <div id="recordTab" class="tab-content" style="display:none;">
             <h2>Record Live Meeting</h2>
             <div id="recorderControls">
@@ -76,14 +73,12 @@
                     <div id="liveDecisions">Loading...</div>
                 </div>
             </div>
-
             <p><small>Ensure your microphone is enabled and permissions are granted.</small></p>
             <p><small>When finished, click "Stop Recording", then "Process Recording". Results will appear above.</small></p>
         </div>
 
 
         <h2>Processed Meetings</h2>
-        <!-- ... (Processed Meetings Table - same as your last complete version) ... -->
         {% if meetings %}
         <table>
             <thead>
@@ -92,7 +87,7 @@
                     <th>Uploaded/Recorded At</th>
                     <th>Status</th>
                     <th>Summary Snippet</th>
-                    <th>Actions</th>
+                    <th style="width: 200px;">Actions</th> <!-- Adjusted width -->
                 </tr>
             </thead>
             <tbody>
@@ -106,14 +101,18 @@
                     <td>{{ (meeting.summary[:100] + '...') if meeting.summary and meeting.summary|length > 100 else meeting.summary }}</td>
                     <td>
                         {% if meeting.processing_status == 'completed' %}
-                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button">View Details</a>
+                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-small">View</a>
                         {% elif meeting.processing_status == 'error' and meeting.summary and 'Transcription failed.' not in meeting.summary and 'Processing Error:' not in meeting.summary and 'OpenAI' not in meeting.summary %}
-                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button">View Details (Partial)</a>
+                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-small">View (Partial)</a>
                         {% elif meeting.processing_status == 'error' %}
-                             <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-info">View Error</a>
+                             <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-small button-info">View Error</a>
                         {% else %}
-                            <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">Processing...</span>
+                            <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }} button-small-placeholder">Processing...</span>
                         {% endif %}
+                        <!-- Delete Button Form -->
+                        <form method="POST" action="{{ url_for('delete_meeting', meeting_id=meeting.id) }}" style="display: inline-block; margin-left: 5px;" onsubmit="return confirmDelete('{{ meeting.filename }}');">
+                            <button type="submit" class="button-small button-danger">Delete</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -125,8 +124,8 @@
     </div>
 
 <script>
-    // ... (JavaScript for tabs and recorder - same as your last complete version) ...
-    function openTab(evt, tabName) {
+    // Tab functionality (same as before)
+    function openTab(evt, tabName) { /* ... */ 
         var i, tabcontent, tablinks;
         tabcontent = document.getElementsByClassName("tab-content");
         for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
@@ -134,13 +133,17 @@
         for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", "");}
         document.getElementById(tabName).style.display = "block"; evt.currentTarget.className += " active";
     }
+
+    // Upload form spinner (same as before)
     const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) {
+    if (uploadForm) { /* ... */
         uploadForm.addEventListener('submit', function() {
             document.getElementById('uploadButton').style.display = 'none';
             document.getElementById('uploadLoadingSpinner').style.display = 'inline-block';
         });
     }
+
+    // Recorder functionality (same as your last complete version)
     const startButton = document.getElementById('startButton');
     const stopButton = document.getElementById('stopButton');
     const processRecordingButton = document.getElementById('processRecordingButton');
@@ -156,13 +159,13 @@
     const liveDecisionsDiv = document.getElementById('liveDecisions');
     let mediaRecorder, audioChunks = [], audioBlob = null, timerInterval, secondsElapsed = 0;
 
-    function resetLiveResults() {
+    function resetLiveResults() { /* ... */ 
         liveMeetingResultsDiv.style.display = 'none'; liveSummaryP.textContent = 'Loading...';
         liveActionItemsDiv.innerHTML = 'Loading...'; liveDecisionsDiv.innerHTML = 'Loading...';
         fullMeetingDetailsLink.href = "#"; liveSummaryP.classList.remove("error-message");
     }
-    if (startButton) { 
-        startButton.onclick = async () => { /* ... same ... */ 
+    if (startButton) {  /* ... (full recorder JS logic from previous version) ... */ 
+        startButton.onclick = async () => { 
             recordingError.textContent = ''; resetLiveResults();
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -183,12 +186,12 @@
                 startButton.disabled = false; stopButton.disabled = true; processRecordingButton.disabled = true;
             }
         };
-        stopButton.onclick = () => { /* ... same ... */ 
+        stopButton.onclick = () => { 
             if (mediaRecorder && mediaRecorder.state === "recording") {
                 mediaRecorder.stop(); startButton.disabled = false; stopButton.disabled = true;
             }
         };
-        processRecordingButton.onclick = async () => { /* ... same, but with updated result handling ... */
+        processRecordingButton.onclick = async () => { 
             if (!audioBlob) { recordingError.textContent = 'No recording.'; return; }
             resetLiveResults(); processRecordingButton.disabled = true; startButton.disabled = true; stopButton.disabled = true;
             recordLoadingSpinner.style.display = 'inline-block'; recordingStatus.textContent = 'Status: Processing...';
@@ -203,13 +206,11 @@
                     recordingStatus.textContent = 'Status: Processed!'; fullMeetingDetailsLink.href = result.redirect_url;
                     liveSummaryP.textContent = result.summary || "N/A";
                     if (result.summary && result.summary.startsWith("ERROR:")) liveSummaryP.classList.add("error-message");
-                    
                     if (result.action_items && result.action_items.length > 0) {
                         let aiHtml = '<table><thead><tr><th>Task</th><th>Owner</th><th>Due</th></tr></thead><tbody>';
                         result.action_items.forEach(i => { aiHtml += `<tr><td>${i.task||'N/A'}</td><td>${i.owner||'N/A'}</td><td>${i.due_date||'N/A'}</td></tr>`;});
                         aiHtml += '</tbody></table>'; liveActionItemsDiv.innerHTML = aiHtml;
                     } else { liveActionItemsDiv.innerHTML = `<p>No action items ${result.nlp_error ? ' (NLP issue).' : 'identified.'}</p>`; }
-
                     if (result.decisions && result.decisions.length > 0) {
                         let dHtml = '<ul>'; result.decisions.forEach(d => { dHtml += `<li>${d}</li>`; });
                         dHtml += '</ul>'; liveDecisionsDiv.innerHTML = dHtml;
@@ -233,6 +234,11 @@
     function startTimer() { secondsElapsed=0; timerDisplay.textContent=formatTime(0); timerInterval=setInterval(()=>{secondsElapsed++; timerDisplay.textContent=formatTime(secondsElapsed);},1000);}
     function stopTimer() { clearInterval(timerInterval); }
     function formatTime(s) {const m=Math.floor(s/60);const sec=s%60;return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; }
+
+    // JavaScript for delete confirmation
+    function confirmDelete(filename) {
+        return confirm(`Are you sure you want to delete the meeting: "${filename}"? This action cannot be undone.`);
+    }
 </script>
 </body>
 </html>

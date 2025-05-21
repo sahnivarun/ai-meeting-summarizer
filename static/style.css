@@ -351,3 +351,24 @@ details summary:hover {
     border-radius: 4px;
     border: 1px solid #ced4da;
 }
+
+/* static/style.css */
+/* ... (all your existing styles, including button-secondary and tracker-filters) ... */
+
+.button-danger {
+    background-color: #dc3545; /* Red for delete/danger actions */
+    color: white;
+}
+.button-danger:hover {
+    background-color: #c82333;
+}
+
+/* Optional: to make the processing status placeholder look more like a button in terms of height */
+.button-small-placeholder {
+    display: inline-block;
+    padding: 5px 10px; /* Match .button-small padding */
+    font-size: 0.9em; /* Match .button-small font-size */
+    /* Add any other styles to make it align well if needed */
+    /* background-color: #e9ecef;
+    border-radius: 4px; */
+}
