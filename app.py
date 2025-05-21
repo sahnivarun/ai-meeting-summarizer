@@ -2,9 +2,9 @@
 import os
 import sqlite3
 import logging
-import openai # For specific error types like AuthenticationError
+import openai 
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, g, jsonify # Added jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, g, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from ics import Calendar, Event
@@ -48,16 +48,13 @@ def get_db():
     return db
 
 # --- HELPER FUNCTION FOR PROCESSING AUDIO (UPLOADED OR RECORDED) ---
+# (This function remains the same as the last complete version)
 def process_audio_file(filepath, original_filename_for_db):
-    """
-    Helper function to process an audio file (transcribe, NLP, DB operations).
-    Returns a dictionary with status, meeting_id, summary, actions, decisions, or error message.
-    """
     meeting_id = None
-    summary_result = "ERROR: Processing did not complete." # Default error
+    summary_result = "ERROR: Processing did not complete." 
     action_items_data = []
     decisions_data = []
-    nlp_error_occurred = True # Assume error until proven otherwise
+    nlp_error_occurred = True 
 
     try:
         db = get_db()
@@ -88,21 +85,16 @@ def process_audio_file(filepath, original_filename_for_db):
         logger.info(f"Status updated to 'processing_nlp' for meeting ID {meeting_id}.")
 
         logger.info(f"Starting NLP processing for meeting ID {meeting_id}...")
-        summary_result = generate_summary(transcript_text) # Returns summary or "ERROR:..." string
+        summary_result = generate_summary(transcript_text)
         logger.info(f"Received summary_result (len: {len(summary_result)}): '{summary_result[:100]}...' for meeting ID {meeting_id}")
-        
-        action_items_data = extract_action_items(transcript_text) # Returns list or empty list if error
+        action_items_data = extract_action_items(transcript_text)
         logger.info(f"Received {len(action_items_data)} action items for meeting ID {meeting_id}")
-        
-        decisions_data = extract_decisions(transcript_text) # Returns list or empty list if error
+        decisions_data = extract_decisions(transcript_text)
         logger.info(f"Received {len(decisions_data)} decisions for meeting ID {meeting_id}")
 
         if summary_result.startswith("ERROR:"):
             logger.error(f"NLP error during summary generation for meeting ID {meeting_id}: {summary_result}")
-            # nlp_error_occurred remains True
         else:
-            # Check if action items or decisions also had issues, though generate_summary is the primary error flag here
-            # For now, if summary is OK, we assume NLP generally worked.
             nlp_error_occurred = False 
         
         current_db_status = 'error' if nlp_error_occurred else 'completed'
@@ -112,113 +104,80 @@ def process_audio_file(filepath, original_filename_for_db):
         cursor.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", 
                        (db_summary_to_store, current_db_status, meeting_id))
         
-        # We always try to insert action_items_data and decisions_data
-        # as they are designed to be empty lists if their specific extraction failed.
         logger.info(f"Attempting to insert {len(action_items_data)} action items for meeting ID {meeting_id}.")
         for item in action_items_data:
             cursor.execute("INSERT INTO action_items (meeting_id, task, owner, due_date) VALUES (?, ?, ?, ?)",
                            (meeting_id, item.get('task'), item.get('owner'), item.get('due_date')))
-        
         logger.info(f"Attempting to insert {len(decisions_data)} decisions for meeting ID {meeting_id}.")
         for decision_text in decisions_data:
             cursor.execute("INSERT INTO decisions (meeting_id, decision_text) VALUES (?, ?)",
                            (meeting_id, decision_text))
-        
         db.commit()
         logger.info(f"Database commit successful for meeting ID {meeting_id} NLP results.")
         
         return {
-            'status': 'success', 
-            'meeting_id': meeting_id, 
-            'summary': summary_result, # Send back the summary (or error string)
-            'action_items': action_items_data,
-            'decisions': decisions_data,
-            'nlp_error': nlp_error_occurred, # Explicit flag for overall NLP health
-            'filename': original_filename_for_db
+            'status': 'success', 'meeting_id': meeting_id, 'summary': summary_result,
+            'action_items': action_items_data, 'decisions': decisions_data,
+            'nlp_error': nlp_error_occurred, 'filename': original_filename_for_db
         }
-
-    except openai.AuthenticationError as e:
+    except openai.AuthenticationError as e: # This specific error should be caught first
         error_msg = f"ERROR: OpenAI Authentication Error (check API Key): {e}"
         logger.critical(f"Meeting ID {meeting_id if meeting_id else 'N/A'}: {error_msg}", exc_info=True)
         if meeting_id:
-            db_conn_auth_err = get_db()
-            cur_auth_err = db_conn_auth_err.cursor()
-            cur_auth_err.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", 
-                           (error_msg, 'error', meeting_id))
-            db_conn_auth_err.commit()
+            try:
+                db_conn_auth_err = get_db(); cur_auth_err = db_conn_auth_err.cursor()
+                cur_auth_err.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", (error_msg, 'error', meeting_id))
+                db_conn_auth_err.commit()
+            except Exception as db_e: logger.error(f"DB error updating auth fail for {meeting_id}: {db_e}")
         return {'status': 'error', 'message': error_msg, 'meeting_id': meeting_id}
     except Exception as e:
         error_msg = f"ERROR: Unexpected error processing file {original_filename_for_db} (meeting ID {meeting_id if meeting_id else 'N/A'}): {e}"
         logger.error(error_msg, exc_info=True)
         if meeting_id:
             try:
-                db_conn_gen_err = get_db()
-                cur_gen_err = db_conn_gen_err.cursor()
+                db_conn_gen_err = get_db(); cur_gen_err = db_conn_gen_err.cursor()
                 summary_error_text = f"Processing Error: {str(e)[:250]}" 
-                cur_gen_err.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", 
-                               (summary_error_text, 'error', meeting_id))
+                cur_gen_err.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", (summary_error_text, 'error', meeting_id))
                 db_conn_gen_err.commit()
-            except Exception as db_err:
-                 logger.error(f"Failed to update meeting ID {meeting_id} status to error after general processing error: {db_err}")
+            except Exception as db_err: logger.error(f"DB error updating general fail for {meeting_id}: {db_err}")
         return {'status': 'error', 'message': f'An unexpected error occurred: {str(e)[:100]}...', 'meeting_id': meeting_id}
-
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    if request.method == 'POST': # This is for traditional file UPLOAD
-        # ... (file check logic as before) ...
+    if request.method == 'POST': # File UPLOAD
         if 'audio_file' not in request.files:
-            logger.warning("File upload attempt with no file part in request.")
-            flash('No file part', 'danger')
-            return redirect(request.url)
+            logger.warning("File upload: No file part."); flash('No file part', 'danger'); return redirect(request.url)
         file = request.files['audio_file']
         if file.filename == '':
-            logger.warning("File upload attempt with no selected file.")
-            flash('No selected file', 'danger')
-            return redirect(request.url)
+            logger.warning("File upload: No selected file."); flash('No selected file', 'danger'); return redirect(request.url)
         
         if file and allowed_file(file.filename):
-            original_filename = secure_filename(file.filename) 
+            original_filename = secure_filename(file.filename)
             timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
             storage_filename = f"{timestamp_prefix}_{original_filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], storage_filename)
-            
             try:
-                if not os.path.exists(app.config['UPLOAD_FOLDER']):
-                    os.makedirs(app.config['UPLOAD_FOLDER'])
+                if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLOAD_FOLDER'])
                 file.save(filepath)
-                logger.info(f"Uploaded file {original_filename} saved to {filepath} (as {storage_filename})")
-                
-                result = process_audio_file(filepath, original_filename) # Call helper
-
+                logger.info(f"Uploaded file {original_filename} saved to {filepath}")
+                result = process_audio_file(filepath, original_filename)
                 if result['status'] == 'success':
-                    flash_message = f'File {result["filename"]} processed.'
-                    flash_category = 'success'
-                    if result.get('nlp_error', False): 
-                        flash_message += " However, there were issues generating some NLP results."
-                        flash_category = 'warning'
-                    flash(flash_message, flash_category)
+                    flash_msg = f'File {result["filename"]} processed.' + (" Issues with NLP." if result.get('nlp_error') else "")
+                    flash(flash_msg, 'warning' if result.get('nlp_error') else 'success')
                     return redirect(url_for('meeting_detail', meeting_id=result['meeting_id']))
                 else:
-                    # result['message'] will contain the error from process_audio_file
                     flash(f"Error processing {original_filename}: {result.get('message', 'Unknown error')}", 'danger')
                     return redirect(url_for('index'))
+            except Exception as e:
+                logger.error(f"Error handling uploaded file {original_filename}: {e}", exc_info=True)
+                flash(f'Error with file upload: {str(e)}', 'danger'); return redirect(request.url)
+        else:
+            logger.warning(f"Upload: Disallowed file type: {file.filename if file else 'N/A'}")
+            flash('File type not allowed', 'warning'); return redirect(request.url)
 
-            except Exception as e: 
-                logger.error(f"Error handling uploaded file {original_filename} before processing: {e}", exc_info=True)
-                flash(f'An error occurred with file upload: {str(e)}', 'danger')
-                return redirect(request.url)
-        else: # File not allowed
-            logger.warning(f"Upload attempt with disallowed file type: {file.filename if file else 'No file object'}")
-            flash('File type not allowed', 'warning')
-            return redirect(request.url)
-
-    # --- GET request part of index route (same as before) ---
-    db = get_db()
-    cursor = db.cursor()
+    db = get_db(); cursor = db.cursor()
     cursor.execute("SELECT id, filename, upload_time, processing_status, summary FROM meetings ORDER BY DATETIME(upload_time) DESC")
     meetings_raw = cursor.fetchall()
-    
     meetings_list = []
     for m_raw in meetings_raw:
         m_item = dict(m_raw) 
@@ -228,78 +187,97 @@ def index():
             for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
                 try: parsed_time = datetime.strptime(current_upload_time, fmt); break 
                 except ValueError: continue
-            m_item['upload_time'] = parsed_time if parsed_time else None
-            if not parsed_time and current_upload_time: 
-                logger.warning(f"Could not parse upload_time str: '{current_upload_time}' ID {m_item.get('id')}.")
+            m_item['upload_time'] = parsed_time
+            if not parsed_time and current_upload_time: logger.warning(f"Could not parse upload_time str: '{current_upload_time}' ID {m_item.get('id')}.")
         elif not isinstance(current_upload_time, datetime) and current_upload_time is not None:
             logger.warning(f"Unexpected type for upload_time: {type(current_upload_time)} val: '{current_upload_time}' ID {m_item.get('id')}.")
             m_item['upload_time'] = None
         meetings_list.append(m_item)
-        
     return render_template('index.html', meetings=meetings_list)
-
 
 @app.route('/process_recorded_audio', methods=['POST'])
 def process_recorded_audio():
-    logger.info("Received request to /process_recorded_audio")
+    logger.info("Request to /process_recorded_audio")
     if 'audio_file' not in request.files:
-        logger.error("No audio_file in request to /process_recorded_audio")
-        return jsonify({'status': 'error', 'message': 'No audio data received.'}), 400
-    
+        logger.error("/process_recorded_audio: No audio_file."); return jsonify({'status': 'error', 'message': 'No audio data.'}), 400
     file = request.files['audio_file']
-    
     if file.filename == '':
-        logger.error("Received audio_file with empty filename in /process_recorded_audio")
-        return jsonify({'status': 'error', 'message': 'No filename for recorded audio.'}), 400
+        logger.error("/process_recorded_audio: Empty filename."); return jsonify({'status': 'error', 'message': 'No filename.'}), 400
 
     original_filename = secure_filename(file.filename) 
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
-
     try:
-        if not os.path.exists(app.config['UPLOAD_FOLDER']):
-            os.makedirs(app.config['UPLOAD_FOLDER'])
+        if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLOAD_FOLDER'])
         file.save(filepath)
         logger.info(f"Live recording '{original_filename}' saved to {filepath}")
-
         db_filename_title = f"Live Recording ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
-        result = process_audio_file(filepath, db_filename_title) # Call helper
-
-        # The 'result' dictionary now contains 'summary', 'action_items', 'decisions'
+        result = process_audio_file(filepath, db_filename_title)
         if result['status'] == 'success':
             redirect_url = url_for('meeting_detail', meeting_id=result['meeting_id'])
-            logger.info(f"Successfully processed live recording. Meeting ID: {result['meeting_id']}.")
-            # Send all relevant data back to JS
+            logger.info(f"Processed live recording. Meeting ID: {result['meeting_id']}.")
             return jsonify({
-                'status': 'success', 
-                'meeting_id': result['meeting_id'], 
-                'redirect_url': redirect_url,
-                'summary': result.get('summary', "Summary not available."), # Ensure these keys exist
-                'action_items': result.get('action_items', []),
-                'decisions': result.get('decisions', []),
-                'nlp_error': result.get('nlp_error', False) # Pass the nlp_error flag too
+                'status': 'success', 'meeting_id': result['meeting_id'], 'redirect_url': redirect_url,
+                'summary': result.get('summary', "N/A"), 'action_items': result.get('action_items', []),
+                'decisions': result.get('decisions', []), 'nlp_error': result.get('nlp_error', False)
             })
         else:
-            logger.error(f"Error processing live recording '{original_filename}': {result['message']}")
-            # Send back error and potentially the meeting_id if it was created before failure
-            return jsonify({'status': 'error', 'message': result.get('message', 'Unknown processing error'), 'meeting_id': result.get('meeting_id')}), 500
-
+            logger.error(f"Error processing live recording '{original_filename}': {result.get('message')}")
+            return jsonify({'status': 'error', 'message': result.get('message', 'Unknown error'), 'meeting_id': result.get('meeting_id')}), 500
     except Exception as e:
         logger.error(f"Critical error handling live recording '{original_filename}': {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': f'Server error during recording processing: {str(e)}'}), 500
+        return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
 
-
-# --- Other routes (meeting_detail, toggle_action_item_status, download_calendar_file) ---
-# These should be the same as the last complete version you have.
-@app.route('/meeting/<int:meeting_id>')
-def meeting_detail(meeting_id):
+# --- NEW ROUTE FOR GLOBAL ACTION ITEM TRACKER ---
+@app.route('/tracker')
+def action_tracker():
     db = get_db()
     cursor = db.cursor()
+    # SQL query to get all action items and join with meetings table for context
+    # Order by meeting date (desc) then by action item status (pending first) then by due_date
+    query = """
+    SELECT 
+        ai.id, ai.task, ai.owner, ai.due_date, ai.status, ai.meeting_id,
+        m.filename as meeting_filename, 
+        m.upload_time as meeting_upload_time
+    FROM action_items ai
+    JOIN meetings m ON ai.meeting_id = m.id
+    ORDER BY DATETIME(m.upload_time) DESC, 
+             CASE ai.status WHEN 'pending' THEN 1 ELSE 2 END,
+             ai.due_date ASC NULLS LAST; 
+    """
+    # The NULLS LAST for due_date might be SQLite specific for ordering, adjust if using other DBs
+    cursor.execute(query)
+    action_items_raw = cursor.fetchall()
+
+    all_action_items = []
+    for item_raw in action_items_raw:
+        item = dict(item_raw)
+        # Ensure meeting_upload_time is datetime for consistent strftime use in template
+        current_meeting_time = item.get('meeting_upload_time')
+        if isinstance(current_meeting_time, str):
+            parsed_time = None
+            for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
+                try: parsed_time = datetime.strptime(current_meeting_time, fmt); break
+                except ValueError: continue
+            item['meeting_upload_time'] = parsed_time
+            if not parsed_time and current_meeting_time: logger.warning(f"Tracker: Could not parse meeting_upload_time str: '{current_meeting_time}' for AI ID {item.get('id')}.")
+        elif not isinstance(current_meeting_time, datetime) and current_meeting_time is not None:
+            logger.warning(f"Tracker: Unexpected type for meeting_upload_time: {type(current_meeting_time)} for AI ID {item.get('id')}.")
+            item['meeting_upload_time'] = None
+        all_action_items.append(item)
+    
+    logger.info(f"Fetched {len(all_action_items)} action items for the global tracker.")
+    return render_template('tracker.html', all_action_items=all_action_items)
+
+
+@app.route('/meeting/<int:meeting_id>')
+def meeting_detail(meeting_id):
+    # ... (meeting_detail route remains the same as your last complete version) ...
+    db = get_db(); cursor = db.cursor()
     cursor.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,))
     meeting_raw = cursor.fetchone()
     if not meeting_raw:
-        logger.warning(f"Attempt to access non-existent meeting_id: {meeting_id}")
-        flash('Meeting not found.', 'danger')
-        return redirect(url_for('index'))
+        logger.warning(f"Detail: Non-existent meeting_id: {meeting_id}"); flash('Meeting not found.', 'danger'); return redirect(url_for('index'))
     meeting = dict(meeting_raw)
     current_upload_time = meeting.get('upload_time')
     if isinstance(current_upload_time, str):
@@ -307,17 +285,18 @@ def meeting_detail(meeting_id):
         for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
             try: parsed_time = datetime.strptime(current_upload_time, fmt); break
             except ValueError: continue
-        meeting['upload_time'] = parsed_time if parsed_time else None
-        if not parsed_time and current_upload_time: logger.warning(f"Could not parse upload_time str in detail: '{current_upload_time}' ID {meeting.get('id')}.")
+        meeting['upload_time'] = parsed_time
+        if not parsed_time and current_upload_time: logger.warning(f"Detail: Could not parse upload_time str: '{current_upload_time}' ID {meeting.get('id')}.")
     elif not isinstance(current_upload_time, datetime) and current_upload_time is not None:
-        logger.warning(f"Unexpected type for upload_time in detail: {type(current_upload_time)} val: '{current_upload_time}' ID {meeting.get('id')}.")
+        logger.warning(f"Detail: Unexpected type for upload_time: {type(current_upload_time)} val: '{current_upload_time}' ID {meeting.get('id')}.")
         meeting['upload_time'] = None
     cursor.execute("SELECT * FROM action_items WHERE meeting_id = ?", (meeting_id,))
     action_items = [dict(item) for item in cursor.fetchall()]
     cursor.execute("SELECT * FROM decisions WHERE meeting_id = ?", (meeting_id,))
     decisions = [dict(decision) for decision in cursor.fetchall()]
-    logger.debug(f"Displaying details for meeting ID {meeting_id}. Summary: '{str(meeting.get('summary'))[:50]}...'")
+    logger.debug(f"Displaying details for meeting ID {meeting_id}.")
     return render_template('meeting_detail.html', meeting=meeting, action_items=action_items, decisions=decisions)
+
 
 @app.route('/action_item/<int:item_id>/toggle', methods=['POST'])
 def toggle_action_item_status(item_id):
@@ -325,27 +304,40 @@ def toggle_action_item_status(item_id):
     cursor = db.cursor()
     cursor.execute("SELECT status, meeting_id FROM action_items WHERE id = ?", (item_id,))
     item = cursor.fetchone()
+
     if not item:
-        logger.warning(f"Attempt to toggle status for non-existent action_item_id: {item_id}")
-        flash('Action item not found.', 'danger'); return redirect(url_for('index')) 
+        logger.warning(f"Toggle: Non-existent action_item_id: {item_id}")
+        flash('Action item not found.', 'danger')
+        return redirect(request.referrer or url_for('index')) # Redirect to previous page or index
+
     new_status = 'completed' if item['status'] == 'pending' else 'pending'
     cursor.execute("UPDATE action_items SET status = ? WHERE id = ?", (new_status, item_id))
     db.commit()
-    logger.info(f"Action item ID {item_id} status toggled to '{new_status}' for meeting ID {item['meeting_id']}.")
+    logger.info(f"Action item ID {item_id} status toggled to '{new_status}'.")
     flash(f'Action item status updated to {new_status}.', 'success')
-    return redirect(url_for('meeting_detail', meeting_id=item['meeting_id']))
+
+    # Redirect back to the 'next' URL if provided (e.g., from tracker page), 
+    # otherwise to the meeting detail page.
+    next_url = request.args.get('next')
+    if next_url and (next_url == url_for('action_tracker') or next_url.startswith(url_for('meeting_detail', meeting_id=0)[:-1])): # Basic check
+        logger.debug(f"Redirecting to 'next' URL: {next_url}")
+        return redirect(next_url)
+    else:
+        logger.debug(f"Redirecting to meeting_detail for meeting ID {item['meeting_id']}")
+        return redirect(url_for('meeting_detail', meeting_id=item['meeting_id']))
+
 
 @app.route('/meeting/<int:meeting_id>/calendar')
 def download_calendar_file(meeting_id):
-    db = get_db()
-    cursor = db.cursor()
+    # ... (download_calendar_file route remains the same as your last complete version) ...
+    db = get_db(); cursor = db.cursor()
     cursor.execute("SELECT filename FROM meetings WHERE id = ?", (meeting_id,))
     if not cursor.fetchone(): 
-        logger.warning(f"Calendar export for non-existent meeting_id: {meeting_id}"); flash('Meeting not found.', 'danger'); return redirect(url_for('index'))
+        logger.warning(f"Calendar: Non-existent meeting_id: {meeting_id}"); flash('Meeting not found.', 'danger'); return redirect(url_for('index'))
     cursor.execute("SELECT task, owner, due_date FROM action_items WHERE meeting_id = ? AND status = 'pending'", (meeting_id,))
     action_items_raw = cursor.fetchall()
     if not action_items_raw:
-        logger.info(f"No pending actions for calendar export for meeting ID {meeting_id}.")
+        logger.info(f"Calendar: No pending actions for meeting ID {meeting_id}.")
         flash('No pending action items to export.', 'info'); return redirect(url_for('meeting_detail', meeting_id=meeting_id))
     cal = Calendar()
     for item_row_cal in action_items_raw:
@@ -369,16 +361,15 @@ def download_calendar_file(meeting_id):
             try: os.remove(ics_filepath); logger.debug(f"Removed temp ICS: {ics_filepath}")
             except Exception as e_rem: logger.error(f"Error removing temp ICS {ics_filepath}: {e_rem}")
 
+
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
         logger.info(f"Created UPLOAD_FOLDER at {UPLOAD_FOLDER} on startup.")
-    
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        logger.info("Root logger configured by app.py because no handlers were found.")
+        logger.info("Root logger configured by app.py (main block).")
     else:
-        logger.info("Root logger seems to be already configured (likely by another module like nlp_processor).")
-
+        logger.info("Root logger previously configured.")
     logger.info("Starting Flask application...")
     app.run(debug=True, host='0.0.0.0', port=5001)

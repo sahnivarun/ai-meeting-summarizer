@@ -322,3 +322,32 @@ details summary:hover {
     color: #dc3545 !important; /* Use !important if other styles override */
     font-weight: bold;
 }
+
+/* static/style.css */
+/* ... (all your existing styles) ... */
+
+.button-secondary {
+    background-color: #6c757d; /* A secondary color like gray */
+    color: white;
+}
+.button-secondary:hover {
+    background-color: #5a6268;
+}
+
+.tracker-filters {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+.tracker-filters label {
+    margin-right: 5px;
+    font-weight: bold;
+}
+.tracker-filters select,
+.tracker-filters input[type="text"] {
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+}

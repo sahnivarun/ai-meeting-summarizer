@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Action Item Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1>Global Action Item Tracker</h1>
+            <a href="{{ url_for('index') }}" class="button back-button">« Back to Dashboard</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="tracker-filters">
+            <label for="statusFilter">Filter by Status:</label>
+            <select id="statusFilter" onchange="filterTable()">
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+            </select>
+            <label for="ownerFilter" style="margin-left: 20px;">Filter by Owner:</label>
+            <input type="text" id="ownerFilter" onkeyup="filterTable()" placeholder="Enter owner name...">
+        </div>
+
+        {% if all_action_items %}
+        <table id="actionItemsTable">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Owner</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Meeting Title</th>
+                    <th>Meeting Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in all_action_items %}
+                <tr data-status="{{ item.status | lower }}" data-owner="{{ item.owner | lower if item.owner else '' }}">
+                    <td>{{ item.task }}</td>
+                    <td>{{ item.owner if item.owner else 'N/A' }}</td>
+                    <td>{{ item.due_date if item.due_date else 'N/A' }}</td>
+                    <td>
+                        <span class="status status-{{ item.status | lower }}">{{ item.status }}</span>
+                    </td>
+                    <td><a href="{{ url_for('meeting_detail', meeting_id=item.meeting_id) }}">{{ item.meeting_filename }}</a></td>
+                    <td>{{ item.meeting_upload_time.strftime('%Y-%m-%d %H:%M') if item.meeting_upload_time else 'N/A' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('toggle_action_item_status', item_id=item.id) }}?next={{ url_for('action_tracker') }}" style="display: inline;">
+                            <button type="submit" class="button-small">
+                                Mark as {{ 'Pending' if item.status == 'completed' else 'Completed' }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No action items found across all meetings.</p>
+        {% endif %}
+    </div>
+
+<script>
+function filterTable() {
+    var statusFilter, ownerFilter, table, tr, tdStatus, tdOwner, i, statusValue, ownerValue;
+    statusFilter = document.getElementById("statusFilter").value.toLowerCase();
+    ownerFilter = document.getElementById("ownerFilter").value.toLowerCase();
+    table = document.getElementById("actionItemsTable");
+    tr = table.getElementsByTagName("tr");
+
+    for (i = 1; i < tr.length; i++) { // Start from 1 to skip header row
+        tr[i].style.display = "none"; // Hide row by default
+        tdStatus = tr[i].getAttribute("data-status");
+        tdOwner = tr[i].getAttribute("data-owner"); // Get data attribute for owner
+
+        let statusMatch = false;
+        if (statusFilter === "all" || tdStatus.indexOf(statusFilter) > -1) {
+            statusMatch = true;
+        }
+
+        let ownerMatch = false;
+        // If owner filter is empty, it's a match. Otherwise, check for substring.
+        if (ownerFilter === "" || (tdOwner && tdOwner.indexOf(ownerFilter) > -1)) {
+            ownerMatch = true;
+        }
+        
+        if (statusMatch && ownerMatch) {
+            tr[i].style.display = ""; // Show row if both filters match
+        }
+    }
+}
+// Initial filter application in case a filter is pre-selected or for onload behavior
+document.addEventListener('DOMContentLoaded', function() {
+    // If you want to pre-select a filter, e.g., 'pending':
+    // document.getElementById("statusFilter").value = "pending";
+    filterTable();
+});
+</script>
+</body>
+</html>
