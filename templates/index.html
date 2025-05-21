@@ -8,9 +8,13 @@
 </head>
 <body>
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div class="header-nav">
             <h1>AI Meeting Summarizer</h1>
-            <a href="{{ url_for('action_tracker') }}" class="button button-secondary">View Action Tracker</a>
+            <nav>
+                <a href="{{ url_for('action_tracker') }}" class="button button-nav">Action Tracker</a>
+                <a href="{{ url_for('decision_tracker') }}" class="button button-nav">Decision Log</a>
+                <a href="{{ url_for('calendar_view') }}" class="button button-nav">Meeting Calendar</a>
+            </nav>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -37,16 +41,16 @@
                 </span>
             </form>
             <p><small>Supported formats: mp3, wav, m4a, mp4, ogg, flac, webm. Max size: 100MB.</small></p>
-            <p><small>Processing can take time, especially for long audio files. Please be patient.</small></p>
+            <p><small>Processing can take time. Please be patient.</small></p>
         </div>
 
-        <!-- Record Live Meeting Tab -->
+        <!-- Record Live Meeting Tab (content same as last version) -->
         <div id="recordTab" class="tab-content" style="display:none;">
             <h2>Record Live Meeting</h2>
             <div id="recorderControls">
-                <button id="startButton" class="button-record">Start Recording</button>
-                <button id="stopButton" class="button-stop" disabled>Stop Recording</button>
-                <button id="processRecordingButton" class="button-process" disabled>Process Recording</button>
+                <button id="startButton" class="button-record">Start</button>
+                <button id="stopButton" class="button-stop" disabled>Stop</button>
+                <button id="processRecordingButton" class="button-process" disabled>Process</button>
                 <span id="timer" style="margin-left: 10px;">00:00</span>
                  <span id="recordLoadingSpinner" class="loading-spinner" style="display:none;">
                     <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." width="30" height="30"> Processing...
@@ -55,39 +59,26 @@
             <div id="recordingStatus" style="margin-top:10px;">Status: Idle</div>
             <audio id="audioPlayback" controls style="display:none; margin-top:10px; width:100%;"></audio>
             <p id="recordingError" class="error-message" style="color:red;"></p>
-            
             <div id="liveMeetingResults" style="display:none; margin-top: 20px;">
-                <h3>Processing Results (for current recording):</h3>
-                <p><a href="#" id="fullMeetingDetailsLink" class="button" target="_blank">View Full Meeting Details Page</a></p>
-                
-                <div class="section">
-                    <h4>Summary:</h4>
-                    <p id="liveSummary" class="preserve-whitespace">Loading...</p>
-                </div>
-                <div class="section">
-                    <h4>Action Items:</h4>
-                    <div id="liveActionItems">Loading...</div>
-                </div>
-                <div class="section">
-                    <h4>Decisions:</h4>
-                    <div id="liveDecisions">Loading...</div>
-                </div>
+                <h3>Results (current recording):</h3>
+                <p><a href="#" id="fullMeetingDetailsLink" class="button button-small" target="_blank">View Full Page</a></p>
+                <div class="section"><h4>Summary:</h4><p id="liveSummary" class="preserve-whitespace"></p></div>
+                <div class="section"><h4>Action Items:</h4><div id="liveActionItems"></div></div>
+                <div class="section"><h4>Decisions:</h4><div id="liveDecisions"></div></div>
             </div>
-            <p><small>Ensure your microphone is enabled and permissions are granted.</small></p>
-            <p><small>When finished, click "Stop Recording", then "Process Recording". Results will appear above.</small></p>
+            <p><small>Ensure microphone permission. Click "Stop", then "Process".</small></p>
         </div>
-
 
         <h2>Processed Meetings</h2>
         {% if meetings %}
-        <table>
+        <table id="processedMeetingsTable">
             <thead>
                 <tr>
-                    <th>Filename/Title</th>
+                    <th>Filename/Stored Name</th>
                     <th>Uploaded/Recorded At</th>
                     <th>Status</th>
                     <th>Summary Snippet</th>
-                    <th style="width: 200px;">Actions</th> <!-- Adjusted width -->
+                    <th style="width: 210px;">Actions</th> <!-- Adjusted width for consistent buttons -->
                 </tr>
             </thead>
             <tbody>
@@ -95,22 +86,17 @@
                 <tr>
                     <td>{{ meeting.filename }}</td>
                     <td>{{ meeting.upload_time.strftime('%Y-%m-%d %H:%M') if meeting.upload_time else 'N/A' }}</td>
-                    <td>
-                        <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">{{ meeting.processing_status }}</span>
-                    </td>
+                    <td><span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">{{ meeting.processing_status }}</span></td>
                     <td>{{ (meeting.summary[:100] + '...') if meeting.summary and meeting.summary|length > 100 else meeting.summary }}</td>
-                    <td>
-                        {% if meeting.processing_status == 'completed' %}
+                    <td class="actions-cell">
+                        {% if meeting.processing_status == 'completed' or (meeting.processing_status == 'error' and meeting.summary and not meeting.summary.startswith("ERROR:")) %}
                             <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-small">View</a>
-                        {% elif meeting.processing_status == 'error' and meeting.summary and 'Transcription failed.' not in meeting.summary and 'Processing Error:' not in meeting.summary and 'OpenAI' not in meeting.summary %}
-                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-small">View (Partial)</a>
                         {% elif meeting.processing_status == 'error' %}
                              <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button button-small button-info">View Error</a>
                         {% else %}
-                            <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }} button-small-placeholder">Processing...</span>
+                            <span class="button-small-placeholder">Processing...</span>
                         {% endif %}
-                        <!-- Delete Button Form -->
-                        <form method="POST" action="{{ url_for('delete_meeting', meeting_id=meeting.id) }}" style="display: inline-block; margin-left: 5px;" onsubmit="return confirmDelete('{{ meeting.filename }}');">
+                        <form method="POST" action="{{ url_for('delete_meeting', meeting_id=meeting.id) }}" class="delete-form" onsubmit="return confirmDelete('{{ meeting.filename }}');">
                             <button type="submit" class="button-small button-danger">Delete</button>
                         </form>
                     </td>
@@ -124,121 +110,14 @@
     </div>
 
 <script>
-    // Tab functionality (same as before)
-    function openTab(evt, tabName) { /* ... */ 
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
-        tablinks = document.getElementsByClassName("tab-button");
-        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", "");}
-        document.getElementById(tabName).style.display = "block"; evt.currentTarget.className += " active";
-    }
-
-    // Upload form spinner (same as before)
-    const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) { /* ... */
-        uploadForm.addEventListener('submit', function() {
-            document.getElementById('uploadButton').style.display = 'none';
-            document.getElementById('uploadLoadingSpinner').style.display = 'inline-block';
-        });
-    }
-
-    // Recorder functionality (same as your last complete version)
-    const startButton = document.getElementById('startButton');
-    const stopButton = document.getElementById('stopButton');
-    const processRecordingButton = document.getElementById('processRecordingButton');
-    const audioPlayback = document.getElementById('audioPlayback');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const recordingError = document.getElementById('recordingError');
-    const timerDisplay = document.getElementById('timer');
-    const recordLoadingSpinner = document.getElementById('recordLoadingSpinner');
-    const liveMeetingResultsDiv = document.getElementById('liveMeetingResults');
-    const fullMeetingDetailsLink = document.getElementById('fullMeetingDetailsLink');
-    const liveSummaryP = document.getElementById('liveSummary');
-    const liveActionItemsDiv = document.getElementById('liveActionItems');
-    const liveDecisionsDiv = document.getElementById('liveDecisions');
-    let mediaRecorder, audioChunks = [], audioBlob = null, timerInterval, secondsElapsed = 0;
-
-    function resetLiveResults() { /* ... */ 
-        liveMeetingResultsDiv.style.display = 'none'; liveSummaryP.textContent = 'Loading...';
-        liveActionItemsDiv.innerHTML = 'Loading...'; liveDecisionsDiv.innerHTML = 'Loading...';
-        fullMeetingDetailsLink.href = "#"; liveSummaryP.classList.remove("error-message");
-    }
-    if (startButton) {  /* ... (full recorder JS logic from previous version) ... */ 
-        startButton.onclick = async () => { 
-            recordingError.textContent = ''; resetLiveResults();
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
-                mediaRecorder.onstop = () => {
-                    audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-                    audioPlayback.src = URL.createObjectURL(audioBlob); audioPlayback.style.display = 'block';
-                    processRecordingButton.disabled = false; recordingStatus.textContent = 'Status: Recording stopped.';
-                    audioChunks = []; stopTimer();
-                };
-                mediaRecorder.start(); recordingStatus.textContent = 'Status: Recording...';
-                startButton.disabled = true; stopButton.disabled = false; processRecordingButton.disabled = true;
-                audioPlayback.style.display = 'none'; startTimer();
-            } catch (err) {
-                console.error("Mic error:", err); recordingStatus.textContent = 'Status: Mic error.';
-                recordingError.textContent = 'Mic access error: ' + err.name + ": " + err.message;
-                startButton.disabled = false; stopButton.disabled = true; processRecordingButton.disabled = true;
-            }
-        };
-        stopButton.onclick = () => { 
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-                mediaRecorder.stop(); startButton.disabled = false; stopButton.disabled = true;
-            }
-        };
-        processRecordingButton.onclick = async () => { 
-            if (!audioBlob) { recordingError.textContent = 'No recording.'; return; }
-            resetLiveResults(); processRecordingButton.disabled = true; startButton.disabled = true; stopButton.disabled = true;
-            recordLoadingSpinner.style.display = 'inline-block'; recordingStatus.textContent = 'Status: Processing...';
-            liveMeetingResultsDiv.style.display = 'block';
-            const formData = new FormData();
-            const recordingFilename = `live_recording_${new Date().toISOString().replace(/[-:.]/g, "").slice(0,-4)}.webm`;
-            formData.append('audio_file', audioBlob, recordingFilename);
-            try {
-                const response = await fetch("{{ url_for('process_recorded_audio') }}", { method: 'POST', body: formData });
-                const result = await response.json();
-                if (response.ok && result.status === 'success') {
-                    recordingStatus.textContent = 'Status: Processed!'; fullMeetingDetailsLink.href = result.redirect_url;
-                    liveSummaryP.textContent = result.summary || "N/A";
-                    if (result.summary && result.summary.startsWith("ERROR:")) liveSummaryP.classList.add("error-message");
-                    if (result.action_items && result.action_items.length > 0) {
-                        let aiHtml = '<table><thead><tr><th>Task</th><th>Owner</th><th>Due</th></tr></thead><tbody>';
-                        result.action_items.forEach(i => { aiHtml += `<tr><td>${i.task||'N/A'}</td><td>${i.owner||'N/A'}</td><td>${i.due_date||'N/A'}</td></tr>`;});
-                        aiHtml += '</tbody></table>'; liveActionItemsDiv.innerHTML = aiHtml;
-                    } else { liveActionItemsDiv.innerHTML = `<p>No action items ${result.nlp_error ? ' (NLP issue).' : 'identified.'}</p>`; }
-                    if (result.decisions && result.decisions.length > 0) {
-                        let dHtml = '<ul>'; result.decisions.forEach(d => { dHtml += `<li>${d}</li>`; });
-                        dHtml += '</ul>'; liveDecisionsDiv.innerHTML = dHtml;
-                    } else { liveDecisionsDiv.innerHTML = `<p>No decisions ${result.nlp_error ? ' (NLP issue).' : 'identified.'}</p>`; }
-                } else {
-                    let errorMsg = result.message || `Server error ${response.status}.`;
-                    recordingError.textContent = 'Processing error: ' + errorMsg; recordingStatus.textContent = 'Status: Failed.';
-                    liveSummaryP.textContent = errorMsg; liveSummaryP.classList.add("error-message");
-                    liveActionItemsDiv.innerHTML = '<p>N/A</p>'; liveDecisionsDiv.innerHTML = '<p>N/A</p>';
-                }
-            } catch (err) {
-                console.error('Fetch/JSON error:', err); recordingError.textContent = 'Network/Response error.';
-                recordingStatus.textContent = 'Status: Failed.'; liveSummaryP.textContent = 'Network/Response error.';
-                liveSummaryP.classList.add("error-message");
-            } finally {
-                recordLoadingSpinner.style.display = 'none'; startButton.disabled = false; 
-                processRecordingButton.disabled = (audioBlob === null); 
-            }
-        };
-    }
-    function startTimer() { secondsElapsed=0; timerDisplay.textContent=formatTime(0); timerInterval=setInterval(()=>{secondsElapsed++; timerDisplay.textContent=formatTime(secondsElapsed);},1000);}
-    function stopTimer() { clearInterval(timerInterval); }
-    function formatTime(s) {const m=Math.floor(s/60);const sec=s%60;return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; }
-
-    // JavaScript for delete confirmation
-    function confirmDelete(filename) {
-        return confirm(`Are you sure you want to delete the meeting: "${filename}"? This action cannot be undone.`);
-    }
+    // Tab, Recorder, confirmDelete JS (same as last version)
+    function openTab(evt, tabName) {var i, tc, tl; tc=document.getElementsByClassName("tab-content"); for(i=0;i<tc.length;i++){tc[i].style.display="none";} tl=document.getElementsByClassName("tab-button"); for(i=0;i<tl.length;i++){tl[i].className=tl[i].className.replace(" active","");} document.getElementById(tabName).style.display="block"; evt.currentTarget.className+=" active";}
+    const uploadForm = document.getElementById('uploadForm'); if(uploadForm){uploadForm.addEventListener('submit', function(){document.getElementById('uploadButton').style.display='none'; document.getElementById('uploadLoadingSpinner').style.display='inline-block';});}
+    const startBtn=document.getElementById('startButton'),stopBtn=document.getElementById('stopButton'),processBtn=document.getElementById('processRecordingButton'),audioPlaybackEl=document.getElementById('audioPlayback'),recStatusEl=document.getElementById('recordingStatus'),recErrorEl=document.getElementById('recordingError'),timerEl=document.getElementById('timer'),recSpinnerEl=document.getElementById('recordLoadingSpinner'),liveResultsDiv=document.getElementById('liveMeetingResults'),fullDetailsLinkEl=document.getElementById('fullMeetingDetailsLink'),liveSummaryEl=document.getElementById('liveSummary'),liveAIsDiv=document.getElementById('liveActionItems'),liveDecisionsDivEl=document.getElementById('liveDecisions');
+    let mRec,aChunks=[],aBlob=null,tInterval,sElapsed=0; function resetLiveRes(){liveResultsDiv.style.display='none';liveSummaryEl.textContent='Loading...';liveAIsDiv.innerHTML='Loading...';liveDecisionsDivEl.innerHTML='Loading...';fullDetailsLinkEl.href="#";liveSummaryEl.classList.remove("error-message");}
+    if(startBtn){startBtn.onclick=async()=>{recErrorEl.textContent='';resetLiveRes();try{const s=await navigator.mediaDevices.getUserMedia({audio:true});mRec=new MediaRecorder(s,{mimeType:'audio/webm'});mRec.ondataavailable=e=>{aChunks.push(e.data);};mRec.onstop=()=>{aBlob=new Blob(aChunks,{type:mRec.mimeType});audioPlaybackEl.src=URL.createObjectURL(aBlob);audioPlaybackEl.style.display='block';processBtn.disabled=false;recStatusEl.textContent='Status: Recording stopped.';aChunks=[];stopTimer();};mRec.start();recStatusEl.textContent='Status: Recording...';startBtn.disabled=true;stopBtn.disabled=false;processBtn.disabled=true;audioPlaybackEl.style.display='none';startTimer();}catch(err){console.error("Mic err:",err);recStatusEl.textContent='Status: Mic error.';recErrorEl.textContent='Mic err: '+err.name+": "+err.message;startBtn.disabled=false;stopBtn.disabled=true;processBtn.disabled=true;}}; stopBtn.onclick=()=>{if(mRec&&mRec.state==="recording"){mRec.stop();startBtn.disabled=false;stopBtn.disabled=true;}}; processBtn.onclick=async()=>{if(!aBlob){recErrorEl.textContent='No recording.';return;} resetLiveRes();processBtn.disabled=true;startBtn.disabled=true;stopBtn.disabled=true;recSpinnerEl.style.display='inline-block';recStatusEl.textContent='Status: Processing...';liveResultsDiv.style.display='block';const fd=new FormData();const fn=`live_recording_${new Date().toISOString().replace(/[-:.]/g,"").slice(0,-4)}.webm`;fd.append('audio_file',aBlob,fn);try{const r=await fetch("{{url_for('process_recorded_audio')}}",{method:'POST',body:fd});const res=await r.json();if(r.ok&&res.status==='success'){recStatusEl.textContent='Status: Processed!';fullDetailsLinkEl.href=res.redirect_url;liveSummaryEl.textContent=res.summary||"N/A";if(res.summary&&res.summary.startsWith("ERROR:"))liveSummaryEl.classList.add("error-message");if(res.action_items&&res.action_items.length>0){let h='<table><thead><tr><th>Task</th><th>Owner</th><th>Due</th></tr></thead><tbody>';res.action_items.forEach(i=>{h+=`<tr><td>${i.task||'N/A'}</td><td>${i.owner||'N/A'}</td><td>${i.due_date||'N/A'}</td></tr>`;});h+='</tbody></table>';liveAIsDiv.innerHTML=h;}else{liveAIsDiv.innerHTML=`<p>No action items ${res.nlp_error?'(NLP issue).':'identified.'}</p>`;} if(res.decisions&&res.decisions.length>0){let h='<ul>';res.decisions.forEach(d=>{h+=`<li>${d}</li>`;});h+='</ul>';liveDecisionsDivEl.innerHTML=h;}else{liveDecisionsDivEl.innerHTML=`<p>No decisions ${res.nlp_error?'(NLP issue).':'identified.'}</p>`;}}else{let eMsg=res.message||`Server error ${r.status}.`;recErrorEl.textContent='Proc. error: '+eMsg;recStatusEl.textContent='Status: Failed.';liveSummaryEl.textContent=eMsg;liveSummaryEl.classList.add("error-message");liveAIsDiv.innerHTML='<p>N/A</p>';liveDecisionsDivEl.innerHTML='<p>N/A</p>';}}catch(err){console.error('Fetch/JSON err:',err);recErrorEl.textContent='Net/Resp error.';recStatusEl.textContent='Status: Failed.';liveSummaryEl.textContent='Net/Resp error.';liveSummaryEl.classList.add("error-message");}finally{recSpinnerEl.style.display='none';startBtn.disabled=false;processBtn.disabled=(aBlob===null);}};}
+    function startTimer(){sElapsed=0;timerEl.textContent=formatTime(0);tInterval=setInterval(()=>{sElapsed++;timerEl.textContent=formatTime(sElapsed);},1000);} function stopTimer(){clearInterval(tInterval);} function formatTime(s){const m=Math.floor(s/60);const sec=s%60;return`${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; }
+    function confirmDelete(filename){return confirm(`Delete meeting: "${filename}"? This cannot be undone.`);}
 </script>
 </body>
 </html>

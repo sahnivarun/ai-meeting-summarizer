@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Decision Log</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1>Global Decision Log</h1>
+            <a href="{{ url_for('index') }}" class="button back-button">« Back to Dashboard</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="tracker-filters">
+            <label for="statusFilterDecision">Filter by Status:</label>
+            <select id="statusFilterDecision" onchange="filterDecisionTable()">
+                <option value="all">All</option>
+                <option value="open">Open</option>
+                <option value="implemented">Implemented</option>
+                <option value="superseded">Superseded</option>
+                <!-- Add other statuses as needed -->
+            </select>
+        </div>
+
+        {% if all_decisions %}
+        <table id="decisionsTable">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Decision</th>
+                    <th>Status</th>
+                    <th style="width: 25%;">Meeting Title</th>
+                    <th>Meeting Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for decision_item in all_decisions %}
+                <tr data-status="{{ decision_item.status | lower if decision_item.status else 'open' }}">
+                    <td class="preserve-whitespace">{{ decision_item.decision_text }}
+                        {% if decision_item.resolution_notes %}
+                            <br><small><em>Notes: {{ decision_item.resolution_notes }}</em></small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status status-decision-{{ decision_item.status | lower if decision_item.status else 'open' }}">{{ decision_item.status | capitalize if decision_item.status else 'Open' }}</span>
+                    </td>
+                    <td><a href="{{ url_for('meeting_detail', meeting_id=decision_item.meeting_id) }}">{{ decision_item.meeting_filename }}</a></td>
+                    <td>{{ decision_item.meeting_upload_time.strftime('%Y-%m-%d %H:%M') if decision_item.meeting_upload_time else 'N/A' }}</td>
+                    <td>
+                        <!-- Example: Toggle between 'open' and 'implemented' -->
+                        <form method="POST" action="{{ url_for('toggle_decision_status', decision_id=decision_item.id) }}?next={{ url_for('decision_tracker') }}" style="display: inline;">
+                            {% if decision_item.status == 'open' %}
+                                <input type="hidden" name="new_status" value="implemented">
+                                <button type="submit" class="button-small">Mark Implemented</button>
+                            {% elif decision_item.status == 'implemented' %}
+                                <input type="hidden" name="new_status" value="open">
+                                <button type="submit" class="button-small button-secondary">Mark Open</button>
+                            {% else %}
+                                <!-- For other statuses, could offer different actions or just display -->
+                                 <input type="hidden" name="new_status" value="open"> <!-- Default toggle back to open -->
+                                <button type="submit" class="button-small button-secondary">Re-Open</button>
+                            {% endif %}
+                            <!-- Add link to edit resolution_notes if desired -->
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No decisions found across all meetings.</p>
+        {% endif %}
+    </div>
+<script>
+function filterDecisionTable() {
+    var statusFilter, table, tr, tdStatus, i, statusValue;
+    statusFilter = document.getElementById("statusFilterDecision").value.toLowerCase();
+    table = document.getElementById("decisionsTable");
+    tr = table.getElementsByTagName("tr");
+
+    for (i = 1; i < tr.length; i++) { // Start from 1 to skip header row
+        tr[i].style.display = "none"; 
+        tdStatus = tr[i].getAttribute("data-status");
+        
+        if (statusFilter === "all" || (tdStatus && tdStatus.indexOf(statusFilter) > -1)) {
+            tr[i].style.display = ""; 
+        }
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    filterDecisionTable();
+});
+</script>
+</body>
+</html>

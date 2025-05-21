@@ -372,3 +372,189 @@ details summary:hover {
     /* background-color: #e9ecef;
     border-radius: 4px; */
 }
+
+/* static/style.css */
+/* ... (all your existing styles for .container, alerts, tables, .button, .button-small, .status etc.) ... */
+
+/* Header Navigation */
+.header-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px; /* Increased margin */
+    padding-bottom: 15px; /* Added padding */
+    border-bottom: 1px solid #dee2e6; /* Separator */
+}
+
+.header-nav h1 {
+    margin: 0; /* Remove default h1 margin */
+    border-bottom: none; /* Remove h1's own border if it had one */
+    padding-bottom: 0;
+}
+
+.header-nav nav a.button-nav {
+    margin-left: 10px;
+    background-color: #6c757d; /* Secondary color for nav buttons */
+    padding: 8px 15px; /* Slightly smaller padding for nav buttons */
+}
+.header-nav nav a.button-nav:hover {
+    background-color: #5a6268;
+}
+
+
+/* Tabs (same as before) */
+.tabs { /* ... */ }
+.tab-button { /* ... */ }
+.tab-button:hover { /* ... */ }
+.tab-button.active { /* ... */ }
+.tab-content { /* ... */ }
+@keyframes fadeEffect { /* ... */ }
+
+/* Recorder Buttons (same as before) */
+.button-record { /* ... */ }
+.button-record:hover { /* ... */ }
+.button-record:disabled { /* ... */ }
+.button-stop { /* ... */ }
+.button-stop:hover { /* ... */ }
+.button-stop:disabled { /* ... */ }
+.button-process { /* ... */ }
+.button-process:hover { /* ... */ }
+.button-process:disabled { /* ... */ }
+
+.loading-spinner { /* ... */ }
+#recorderControls button { /* ... */ }
+
+/* Live Meeting Results (same as before) */
+#liveMeetingResults { /* ... */ }
+#liveMeetingResults h3 { /* ... */ }
+#liveMeetingResults h4 { /* ... */ }
+#liveMeetingResults .section { /* ... */ }
+#liveMeetingResults #liveActionItems table { /* ... */ }
+#liveMeetingResults #liveActionItems th,
+#liveMeetingResults #liveActionItems td { /* ... */ }
+#liveMeetingResults #liveDecisions ul { /* ... */ }
+#liveMeetingResults #liveDecisions li { /* ... */ }
+
+/* Error Message Styling (same as before) */
+.error-message { /* ... */ }
+
+/* Tracker Page Filters (same as before) */
+.tracker-filters { /* ... */ }
+.tracker-filters label { /* ... */ }
+.tracker-filters select,
+.tracker-filters input[type="text"] { /* ... */ }
+
+/* Button Danger (for delete) */
+.button-danger {
+    background-color: #dc3545;
+    color: white;
+}
+.button-danger:hover {
+    background-color: #c82333;
+}
+
+/* --- Button Size Consistency for "Actions" column in Processed Meetings table --- */
+.actions-cell .button, 
+.actions-cell .button-small,
+.actions-cell .delete-form .button-small { /* Target delete button specifically if needed */
+    padding: 6px 10px; /* Consistent padding */
+    font-size: 0.85em; /* Consistent font size */
+    margin-bottom: 3px; /* Add some space if they wrap */
+    vertical-align: middle; /* Align buttons nicely if on same line */
+}
+.actions-cell .delete-form {
+    display: inline-block; /* Make form inline */
+    margin-left: 5px;
+}
+
+/* Placeholder for "Processing..." text to align with buttons */
+.button-small-placeholder {
+    display: inline-block;
+    padding: 6px 10px; /* Match .button-small padding */
+    font-size: 0.85em; /* Match .button-small font-size */
+    color: #6c757d; /* Muted color */
+    /* border: 1px solid transparent; /* To maintain height if needed */
+    /* line-height: normal; To match button line height */
+    vertical-align: middle;
+}
+
+/* Calendar Page Specific Styles from calendar_view.html (already there) */
+/* .calendar-container { ... } */
+/* #myCalendar { ... } */
+/* .vjc-day.has-meeting .vjc-date { ... } */
+/* #selectedDateMeetings { ... } */
+
+/* static/style.css */
+/* ... (all existing styles) ... */
+
+/* Header Navigation (from previous step) */
+.header-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px; 
+    padding-bottom: 15px; 
+    border-bottom: 1px solid #dee2e6; 
+}
+.header-nav h1 { margin: 0; border-bottom: none; padding-bottom: 0; }
+.header-nav nav a.button-nav {
+    margin-left: 10px;
+    background-color: #6c757d; 
+    padding: 8px 15px; 
+}
+.header-nav nav a.button-nav:hover { background-color: #5a6268; }
+
+/* Status indicator for decisions */
+.status-decision-open { background-color: #ffc107; color: #212529; } /* Yellow for open */
+.status-decision-implemented { background-color: #28a745; color: white; } /* Green for implemented */
+.status-decision-superseded { background-color: #6c757d; color: white; } /* Gray for superseded */
+/* Add more as needed */
+
+/* Ensure action cell buttons are uniform and delete form is inline */
+.actions-cell .button, 
+.actions-cell .button-small,
+.actions-cell .delete-form .button-small {
+    padding: 5px 10px; /* Make all buttons in this cell same padding */
+    font-size: 0.9em;   /* And font size */
+    margin-right: 5px;  /* Space between buttons */
+    margin-bottom: 3px; /* Space if they wrap */
+    vertical-align: middle;
+}
+.actions-cell .delete-form {
+    display: inline-block; /* Keep form on same line as other buttons if possible */
+    margin-left: 0; /* Reset margin if button-small already has it */
+}
+.button-small-placeholder { /* For "Processing..." text */
+    display: inline-block;
+    padding: 5px 10px;
+    font-size: 0.9em;
+    color: #6c757d;
+    vertical-align: middle;
+}
+
+/* Calendar View specific styles (from previous step, ensure they are present) */
+.calendar-wrapper { display: flex; flex-direction: column; gap: 20px; }
+.calendar-container { display: flex; gap: 20px; flex-wrap: wrap; }
+#myCalendar { min-width: 300px; flex-basis: 380px; flex-grow: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 5px; padding: 10px; }
+.vjc-main { border: none; }
+.vjc-header { background-color: #007bff; color: white; border-top-left-radius: 5px; border-top-right-radius: 5px;}
+.vjc-header svg { fill: white; }
+.vjc-week { border-bottom: 1px solid #f0f0f0; }
+.vjc-day { min-height: 40px; }
+.vjc-date { transition: background-color 0.2s, color 0.2s; }
+.vjc-day.has-meeting .vjc-date { background-color: #007bff !important; color: white !important; border-radius: 50% !important; font-weight: bold; position: relative; }
+.vjc-day.vjc-selected .vjc-date { background-color: #0056b3 !important; box-shadow: 0 0 0 2px white, 0 0 0 4px #0056b3; }
+#meetingDetailsPanel { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; min-height: 200px; }
+#meetingDetailsPanel h3, #meetingDetailsPanel h4 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+#meetingDetailsPanel h4 { font-size: 1.1em; color: #333; }
+#meetingsListForDate, #selectedMeetingContent { list-style-type: none; padding-left: 0; }
+#meetingsListForDate li { padding: 10px; border: 1px solid #eee; margin-bottom: 8px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+#meetingsListForDate li:hover { background-color: #e9ecef; }
+#meetingsListForDate li.selected-meeting-item { background-color: #d1e7dd; border-left: 4px solid #28a745;}
+.meeting-time { font-size: 0.9em; color: #555; margin-left: 10px;}
+.no-meetings-message, .select-meeting-message { color: #777; font-style: italic; padding: 10px; }
+#selectedMeetingContent .section { margin-bottom: 15px; }
+#selectedMeetingContent .preserve-whitespace { white-space: pre-wrap; background-color: #f8f9fa; padding:10px; border-radius:3px; font-size:0.95em; max-height: 200px; overflow-y: auto;}
+#selectedMeetingContent table { font-size: 0.9em; }
+#selectedMeetingContent ul { padding-left: 20px; }
+@media (min-width: 768px) { .calendar-wrapper { flex-direction: row; } #meetingDetailsPanel { margin-top: 0; flex-basis: 550px; flex-grow: 2; } }
