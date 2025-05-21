@@ -266,3 +266,59 @@ details summary:hover {
 #recorderControls button {
     margin-right: 5px;
 }
+
+/* static/style.css */
+/* ... (all your existing styles, including tab and recorder button styles) ... */
+
+#liveMeetingResults {
+    border: 1px solid #e0e0e0;
+    padding: 15px;
+    margin-top: 20px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+}
+
+#liveMeetingResults h3 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+#liveMeetingResults h4 {
+    margin-top: 15px;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+#liveMeetingResults .section { /* Re-using .section class for consistency */
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #ddd;
+}
+#liveMeetingResults .section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+#liveMeetingResults #liveActionItems table {
+    font-size: 0.9em;
+}
+#liveMeetingResults #liveActionItems th,
+#liveMeetingResults #liveActionItems td {
+    padding: 6px 8px;
+}
+
+#liveMeetingResults #liveDecisions ul {
+    list-style-type: disc;
+    padding-left: 20px;
+    margin: 5px 0;
+}
+#liveMeetingResults #liveDecisions li {
+    margin-bottom: 5px;
+}
+
+.error-message { /* Class for displaying error text in red */
+    color: #dc3545 !important; /* Use !important if other styles override */
+    font-weight: bold;
+}

@@ -17,7 +17,7 @@ from nlp_processor import generate_summary, extract_action_items, extract_decisi
 
 # Configuration (same as before)
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'mp3', 'wav', 'm4a', 'mp4', 'ogg', 'flac', 'webm'} # Ensure webm is here
+ALLOWED_EXTENSIONS = {'mp3', 'wav', 'm4a', 'mp4', 'ogg', 'flac', 'webm'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -51,13 +51,17 @@ def get_db():
 def process_audio_file(filepath, original_filename_for_db):
     """
     Helper function to process an audio file (transcribe, NLP, DB operations).
-    Returns a dictionary with status and meeting_id or error message.
+    Returns a dictionary with status, meeting_id, summary, actions, decisions, or error message.
     """
     meeting_id = None
+    summary_result = "ERROR: Processing did not complete." # Default error
+    action_items_data = []
+    decisions_data = []
+    nlp_error_occurred = True # Assume error until proven otherwise
+
     try:
         db = get_db()
         cursor = db.cursor()
-        # Use original_filename_for_db for the DB record, filepath for processing
         cursor.execute("INSERT INTO meetings (filename, processing_status) VALUES (?, ?)", 
                        (original_filename_for_db, 'uploaded'))
         meeting_id = cursor.lastrowid
@@ -71,10 +75,11 @@ def process_audio_file(filepath, original_filename_for_db):
 
         if not transcript_text:
             logger.error(f"Transcription failed for meeting ID {meeting_id} ('{original_filename_for_db}').")
-            cursor.execute("UPDATE meetings SET processing_status = ?, transcript = ? WHERE id = ?", 
-                           ('error', 'Transcription failed.', meeting_id))
+            summary_result = 'ERROR: Transcription failed.'
+            cursor.execute("UPDATE meetings SET processing_status = ?, transcript = ?, summary = ? WHERE id = ?", 
+                           ('error', 'Transcription failed.', summary_result, meeting_id))
             db.commit()
-            return {'status': 'error', 'message': 'Transcription failed.'}
+            return {'status': 'error', 'message': summary_result, 'meeting_id': meeting_id}
         
         logger.info(f"Transcription complete for meeting ID {meeting_id}. Transcript length: {len(transcript_text)} chars.")
         cursor.execute("UPDATE meetings SET transcript = ?, processing_status = ? WHERE id = ?", 
@@ -83,17 +88,22 @@ def process_audio_file(filepath, original_filename_for_db):
         logger.info(f"Status updated to 'processing_nlp' for meeting ID {meeting_id}.")
 
         logger.info(f"Starting NLP processing for meeting ID {meeting_id}...")
-        summary_result = generate_summary(transcript_text)
+        summary_result = generate_summary(transcript_text) # Returns summary or "ERROR:..." string
         logger.info(f"Received summary_result (len: {len(summary_result)}): '{summary_result[:100]}...' for meeting ID {meeting_id}")
-        action_items_data = extract_action_items(transcript_text)
+        
+        action_items_data = extract_action_items(transcript_text) # Returns list or empty list if error
         logger.info(f"Received {len(action_items_data)} action items for meeting ID {meeting_id}")
-        decisions_data = extract_decisions(transcript_text)
+        
+        decisions_data = extract_decisions(transcript_text) # Returns list or empty list if error
         logger.info(f"Received {len(decisions_data)} decisions for meeting ID {meeting_id}")
 
-        nlp_error_occurred = False
         if summary_result.startswith("ERROR:"):
             logger.error(f"NLP error during summary generation for meeting ID {meeting_id}: {summary_result}")
-            nlp_error_occurred = True
+            # nlp_error_occurred remains True
+        else:
+            # Check if action items or decisions also had issues, though generate_summary is the primary error flag here
+            # For now, if summary is OK, we assume NLP generally worked.
+            nlp_error_occurred = False 
         
         current_db_status = 'error' if nlp_error_occurred else 'completed'
         db_summary_to_store = summary_result
@@ -102,25 +112,33 @@ def process_audio_file(filepath, original_filename_for_db):
         cursor.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", 
                        (db_summary_to_store, current_db_status, meeting_id))
         
-        if not nlp_error_occurred:
-            logger.info(f"Attempting to insert {len(action_items_data)} action items for meeting ID {meeting_id}.")
-            for item in action_items_data:
-                cursor.execute("INSERT INTO action_items (meeting_id, task, owner, due_date) VALUES (?, ?, ?, ?)",
-                               (meeting_id, item.get('task'), item.get('owner'), item.get('due_date')))
-            logger.info(f"Attempting to insert {len(decisions_data)} decisions for meeting ID {meeting_id}.")
-            for decision_text in decisions_data:
-                cursor.execute("INSERT INTO decisions (meeting_id, decision_text) VALUES (?, ?)",
-                               (meeting_id, decision_text))
-        else:
-            logger.warning(f"Skipping insertion of action items/decisions for meeting ID {meeting_id} due to nlp_error_occurred=True.")
+        # We always try to insert action_items_data and decisions_data
+        # as they are designed to be empty lists if their specific extraction failed.
+        logger.info(f"Attempting to insert {len(action_items_data)} action items for meeting ID {meeting_id}.")
+        for item in action_items_data:
+            cursor.execute("INSERT INTO action_items (meeting_id, task, owner, due_date) VALUES (?, ?, ?, ?)",
+                           (meeting_id, item.get('task'), item.get('owner'), item.get('due_date')))
+        
+        logger.info(f"Attempting to insert {len(decisions_data)} decisions for meeting ID {meeting_id}.")
+        for decision_text in decisions_data:
+            cursor.execute("INSERT INTO decisions (meeting_id, decision_text) VALUES (?, ?)",
+                           (meeting_id, decision_text))
         
         db.commit()
         logger.info(f"Database commit successful for meeting ID {meeting_id} NLP results.")
         
-        return {'status': 'success', 'meeting_id': meeting_id, 'nlp_error': nlp_error_occurred, 'filename': original_filename_for_db}
+        return {
+            'status': 'success', 
+            'meeting_id': meeting_id, 
+            'summary': summary_result, # Send back the summary (or error string)
+            'action_items': action_items_data,
+            'decisions': decisions_data,
+            'nlp_error': nlp_error_occurred, # Explicit flag for overall NLP health
+            'filename': original_filename_for_db
+        }
 
     except openai.AuthenticationError as e:
-        error_msg = f"OpenAI Authentication Error (check API Key): {e}"
+        error_msg = f"ERROR: OpenAI Authentication Error (check API Key): {e}"
         logger.critical(f"Meeting ID {meeting_id if meeting_id else 'N/A'}: {error_msg}", exc_info=True)
         if meeting_id:
             db_conn_auth_err = get_db()
@@ -128,9 +146,9 @@ def process_audio_file(filepath, original_filename_for_db):
             cur_auth_err.execute("UPDATE meetings SET summary = ?, processing_status = ? WHERE id = ?", 
                            (error_msg, 'error', meeting_id))
             db_conn_auth_err.commit()
-        return {'status': 'error', 'message': error_msg}
+        return {'status': 'error', 'message': error_msg, 'meeting_id': meeting_id}
     except Exception as e:
-        error_msg = f"Unexpected error processing file {original_filename_for_db} (meeting ID {meeting_id if meeting_id else 'N/A'}): {e}"
+        error_msg = f"ERROR: Unexpected error processing file {original_filename_for_db} (meeting ID {meeting_id if meeting_id else 'N/A'}): {e}"
         logger.error(error_msg, exc_info=True)
         if meeting_id:
             try:
@@ -142,12 +160,13 @@ def process_audio_file(filepath, original_filename_for_db):
                 db_conn_gen_err.commit()
             except Exception as db_err:
                  logger.error(f"Failed to update meeting ID {meeting_id} status to error after general processing error: {db_err}")
-        return {'status': 'error', 'message': f'An unexpected error occurred: {str(e)[:100]}...'}
+        return {'status': 'error', 'message': f'An unexpected error occurred: {str(e)[:100]}...', 'meeting_id': meeting_id}
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST': # This is for traditional file UPLOAD
+        # ... (file check logic as before) ...
         if 'audio_file' not in request.files:
             logger.warning("File upload attempt with no file part in request.")
             flash('No file part', 'danger')
@@ -159,9 +178,8 @@ def index():
             return redirect(request.url)
         
         if file and allowed_file(file.filename):
-            original_filename = secure_filename(file.filename) # Use original for DB entry title
+            original_filename = secure_filename(file.filename) 
             timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
-            # Create a unique filename for storage to avoid collisions, but keep original for display
             storage_filename = f"{timestamp_prefix}_{original_filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], storage_filename)
             
@@ -171,27 +189,27 @@ def index():
                 file.save(filepath)
                 logger.info(f"Uploaded file {original_filename} saved to {filepath} (as {storage_filename})")
                 
-                # Use the helper function for processing
-                result = process_audio_file(filepath, original_filename)
+                result = process_audio_file(filepath, original_filename) # Call helper
 
                 if result['status'] == 'success':
                     flash_message = f'File {result["filename"]} processed.'
                     flash_category = 'success'
-                    if result.get('nlp_error', False): # Check if 'nlp_error' key exists and is True
+                    if result.get('nlp_error', False): 
                         flash_message += " However, there were issues generating some NLP results."
                         flash_category = 'warning'
                     flash(flash_message, flash_category)
                     return redirect(url_for('meeting_detail', meeting_id=result['meeting_id']))
                 else:
-                    flash(f"Error processing {original_filename}: {result['message']}", 'danger')
+                    # result['message'] will contain the error from process_audio_file
+                    flash(f"Error processing {original_filename}: {result.get('message', 'Unknown error')}", 'danger')
                     return redirect(url_for('index'))
 
-            except Exception as e: # Catch errors during file saving or before process_audio_file call
+            except Exception as e: 
                 logger.error(f"Error handling uploaded file {original_filename} before processing: {e}", exc_info=True)
                 flash(f'An error occurred with file upload: {str(e)}', 'danger')
                 return redirect(request.url)
-        else:
-            logger.warning(f"Upload attempt with disallowed file type: {file.filename}")
+        else: # File not allowed
+            logger.warning(f"Upload attempt with disallowed file type: {file.filename if file else 'No file object'}")
             flash('File type not allowed', 'warning')
             return redirect(request.url)
 
@@ -234,10 +252,7 @@ def process_recorded_audio():
         logger.error("Received audio_file with empty filename in /process_recorded_audio")
         return jsonify({'status': 'error', 'message': 'No filename for recorded audio.'}), 400
 
-    # The JavaScript sends a filename like "live_recording_YYYYMMDDTHHMMSS.webm"
     original_filename = secure_filename(file.filename) 
-    # We can use this directly or create another unique name for storage if paranoid,
-    # but since it's timestamped from JS, it should be reasonably unique.
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
 
     try:
@@ -246,19 +261,27 @@ def process_recorded_audio():
         file.save(filepath)
         logger.info(f"Live recording '{original_filename}' saved to {filepath}")
 
-        # Use the helper function for processing
-        # For DB, we can use a more descriptive title than the temp filename.
         db_filename_title = f"Live Recording ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
-        result = process_audio_file(filepath, db_filename_title)
+        result = process_audio_file(filepath, db_filename_title) # Call helper
 
+        # The 'result' dictionary now contains 'summary', 'action_items', 'decisions'
         if result['status'] == 'success':
-            # Don't flash here, JS will redirect
             redirect_url = url_for('meeting_detail', meeting_id=result['meeting_id'])
-            logger.info(f"Successfully processed live recording. Meeting ID: {result['meeting_id']}. Redirecting to: {redirect_url}")
-            return jsonify({'status': 'success', 'meeting_id': result['meeting_id'], 'redirect_url': redirect_url})
+            logger.info(f"Successfully processed live recording. Meeting ID: {result['meeting_id']}.")
+            # Send all relevant data back to JS
+            return jsonify({
+                'status': 'success', 
+                'meeting_id': result['meeting_id'], 
+                'redirect_url': redirect_url,
+                'summary': result.get('summary', "Summary not available."), # Ensure these keys exist
+                'action_items': result.get('action_items', []),
+                'decisions': result.get('decisions', []),
+                'nlp_error': result.get('nlp_error', False) # Pass the nlp_error flag too
+            })
         else:
             logger.error(f"Error processing live recording '{original_filename}': {result['message']}")
-            return jsonify({'status': 'error', 'message': result['message']}), 500
+            # Send back error and potentially the meeting_id if it was created before failure
+            return jsonify({'status': 'error', 'message': result.get('message', 'Unknown processing error'), 'meeting_id': result.get('meeting_id')}), 500
 
     except Exception as e:
         logger.error(f"Critical error handling live recording '{original_filename}': {e}", exc_info=True)
@@ -267,7 +290,6 @@ def process_recorded_audio():
 
 # --- Other routes (meeting_detail, toggle_action_item_status, download_calendar_file) ---
 # These should be the same as the last complete version you have.
-# For brevity, I'm not repeating them here, but ensure they are present.
 @app.route('/meeting/<int:meeting_id>')
 def meeting_detail(meeting_id):
     db = get_db()
@@ -318,7 +340,7 @@ def download_calendar_file(meeting_id):
     db = get_db()
     cursor = db.cursor()
     cursor.execute("SELECT filename FROM meetings WHERE id = ?", (meeting_id,))
-    if not cursor.fetchone(): # Check if meeting exists
+    if not cursor.fetchone(): 
         logger.warning(f"Calendar export for non-existent meeting_id: {meeting_id}"); flash('Meeting not found.', 'danger'); return redirect(url_for('index'))
     cursor.execute("SELECT task, owner, due_date FROM action_items WHERE meeting_id = ? AND status = 'pending'", (meeting_id,))
     action_items_raw = cursor.fetchall()
@@ -346,7 +368,6 @@ def download_calendar_file(meeting_id):
         if os.path.exists(ics_filepath):
             try: os.remove(ics_filepath); logger.debug(f"Removed temp ICS: {ics_filepath}")
             except Exception as e_rem: logger.error(f"Error removing temp ICS {ics_filepath}: {e_rem}")
-
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
