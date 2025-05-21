@@ -28,17 +28,18 @@
         <div class="tabs">
             <button class="tab-button active" onclick="openTab(event, 'uploadTab')">Upload Audio File</button>
             <button class="tab-button" onclick="openTab(event, 'recordTab')">Record Live Meeting</button>
+            <button class="tab-button" onclick="openTab(event, 'textTab')">Process Text Transcript</button>
         </div>
 
         <!-- Upload Audio File Tab -->
         <div id="uploadTab" class="tab-content" style="display:block;">
             <h2>Upload New Meeting Audio</h2>
             <form method="POST" action="{{ url_for('index') }}" enctype="multipart/form-data" id="uploadForm">
-                <div>
+                <div class="form-group"> <!-- Added form-group for consistency -->
                     <label for="meetingTitleUpload">Meeting Title (Optional):</label>
                     <input type="text" id="meetingTitleUpload" name="meeting_title_upload" placeholder="E.g., Q3 Planning Session">
                 </div>
-                <div style="margin-top: 10px;">
+                <div class="form-group" style="margin-top: 10px;"> <!-- Added form-group -->
                     <label for="audioFileUpdload">Audio File:</label>
                     <input type="file" id="audioFileUpdload" name="audio_file" accept=".mp3,.wav,.m4a,.mp4,.ogg,.flac,.webm" required>
                 </div>
@@ -53,7 +54,7 @@
         <!-- Record Live Meeting Tab -->
         <div id="recordTab" class="tab-content" style="display:none;">
             <h2>Record Live Meeting</h2>
-            <div>
+            <div class="form-group"> <!-- Added form-group -->
                 <label for="meetingTitleRecord">Meeting Title (Optional):</label>
                 <input type="text" id="meetingTitleRecord" name="meeting_title_record" placeholder="E.g., Daily Standup">
             </div>
@@ -73,30 +74,41 @@
             <div id="liveMeetingResults" style="display:none; margin-top: 20px;">
                 <h3>Processing Results (for "<span id="liveMeetingTitleDisplay"></span>"):</h3>
                 <p><a href="#" id="fullMeetingDetailsLink" class="button" target="_blank">View Full Meeting Details Page</a></p>
-                
-                <div class="section">
-                    <h4>Summary:</h4>
-                    <p id="liveSummary" class="preserve-whitespace">Loading...</p>
-                </div>
-                <div class="section">
-                    <h4>Action Items:</h4>
-                    <div id="liveActionItems">Loading...</div>
-                </div>
-                <div class="section">
-                    <h4>Decisions:</h4>
-                    <div id="liveDecisions">Loading...</div>
-                </div>
+                <div class="section"><h4>Summary:</h4><p id="liveSummary" class="preserve-whitespace">Loading...</p></div>
+                <div class="section"><h4>Action Items:</h4><div id="liveActionItems">Loading...</div></div>
+                <div class="section"><h4>Decisions:</h4><div id="liveDecisions">Loading...</div></div>
             </div>
             <p><small>Ensure your microphone is enabled and permissions are granted.</small></p>
         </div>
 
+        <!-- Process Text Transcript Tab -->
+        <div id="textTab" class="tab-content" style="display:none;">
+            <h2>Process Text Transcript</h2>
+            <form method="POST" action="{{ url_for('process_text_transcript') }}" id="textTranscriptForm">
+                <div class="form-group"> <!-- Added form-group -->
+                    <label for="meetingTitleText">Meeting Title (Optional):</label>
+                    <input type="text" id="meetingTitleText" name="meeting_title_text" placeholder="E.g., Project Phoenix Debrief">
+                </div>
+                <div class="form-group" style="margin-top: 10px;"> <!-- Added form-group -->
+                    <label for="meetingTranscriptText">Paste Full Meeting Transcript:</label>
+                    <!-- Textarea will be styled by CSS to be wide -->
+                    <textarea id="meetingTranscriptText" name="transcript_text" rows="15" required placeholder="Paste your meeting transcript here..."></textarea>
+                </div>
+                <button type="submit" id="processTextButton" style="margin-top: 15px;">Process Transcript</button>
+                <span id="textLoadingSpinner" class="loading-spinner" style="display:none;">
+                    <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." width="30" height="30"> Processing...
+                </span>
+            </form>
+        </div>
+
 
         <h2>Processed Meetings</h2>
+        <!-- ... (Processed Meetings Table - same as before) ... -->
         {% if meetings %}
         <table id="processedMeetingsTable">
             <thead>
                 <tr>
-                    <th>Meeting Title</th> <!-- Changed from Filename/Title -->
+                    <th>Meeting Title</th>
                     <th>Uploaded/Recorded At</th>
                     <th>Status</th>
                     <th>Summary Snippet</th>
@@ -106,12 +118,9 @@
             <tbody>
                 {% for meeting in meetings %}
                 <tr>
-                    <!-- Display meeting_title, fallback to filename if title is null/empty -->
                     <td>{{ meeting.display_title_for_list }}</td> 
                     <td>{{ meeting.display_time_for_list.strftime('%Y-%m-%d %H:%M') if meeting.display_time_for_list else 'N/A' }}</td>
-                    <td>
-                        <span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">{{ meeting.processing_status }}</span>
-                    </td>
+                    <td><span class="status status-{{ meeting.processing_status.replace(' ', '-') | lower }}">{{ meeting.processing_status }}</span></td>
                     <td>{{ (meeting.summary[:100] + '...') if meeting.summary and meeting.summary|length > 100 else meeting.summary }}</td>
                     <td class="actions-cell">
                         {% if meeting.processing_status == 'completed' or (meeting.processing_status == 'error' and meeting.summary and 'Transcription failed.' not in meeting.summary and 'Processing Error:' not in meeting.summary and 'OpenAI' not in meeting.summary) %}
@@ -135,8 +144,9 @@
     </div>
 
 <script>
-    // Tab functionality (same as before)
-    function openTab(evt, tabName) { /* ... */ 
+    // Your existing JavaScript (tab functionality, recorder, spinners, confirmDelete)
+    // No changes needed to JS for this specific textarea width fix.
+    function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
         tabcontent = document.getElementsByClassName("tab-content");
         for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
@@ -144,17 +154,20 @@
         for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", "");}
         document.getElementById(tabName).style.display = "block"; evt.currentTarget.className += " active";
     }
-
-    // Upload form spinner (same as before)
     const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) { /* ... */
+    if (uploadForm) {
         uploadForm.addEventListener('submit', function() {
             document.getElementById('uploadButton').style.display = 'none';
             document.getElementById('uploadLoadingSpinner').style.display = 'inline-block';
         });
     }
-
-    // Recorder functionality
+    const textTranscriptForm = document.getElementById('textTranscriptForm');
+    if (textTranscriptForm) {
+        textTranscriptForm.addEventListener('submit', function() {
+            document.getElementById('processTextButton').style.display = 'none';
+            document.getElementById('textLoadingSpinner').style.display = 'inline-block';
+        });
+    }
     const startButton = document.getElementById('startButton');
     const stopButton = document.getElementById('stopButton');
     const processRecordingButton = document.getElementById('processRecordingButton');
@@ -163,9 +176,8 @@
     const recordingError = document.getElementById('recordingError');
     const timerDisplay = document.getElementById('timer');
     const recordLoadingSpinner = document.getElementById('recordLoadingSpinner');
-    const meetingTitleRecordInput = document.getElementById('meetingTitleRecord'); // Get the new input field
-    const liveMeetingTitleDisplay = document.getElementById('liveMeetingTitleDisplay'); // For showing title in results
-
+    const meetingTitleRecordInput = document.getElementById('meetingTitleRecord'); 
+    const liveMeetingTitleDisplay = document.getElementById('liveMeetingTitleDisplay'); 
     const liveMeetingResultsDiv = document.getElementById('liveMeetingResults');
     const fullMeetingDetailsLink = document.getElementById('fullMeetingDetailsLink');
     const liveSummaryP = document.getElementById('liveSummary');
@@ -173,15 +185,14 @@
     const liveDecisionsDiv = document.getElementById('liveDecisions');
     let mediaRecorder, audioChunks = [], audioBlob = null, timerInterval, secondsElapsed = 0;
 
-    function resetLiveResults() { /* ... (same as before) ... */ 
+    function resetLiveResults() { 
         liveMeetingResultsDiv.style.display = 'none'; liveSummaryP.textContent = 'Loading...';
         liveActionItemsDiv.innerHTML = 'Loading...'; liveDecisionsDiv.innerHTML = 'Loading...';
         fullMeetingDetailsLink.href = "#"; liveSummaryP.classList.remove("error-message");
         if(liveMeetingTitleDisplay) liveMeetingTitleDisplay.textContent = "";
     }
-
     if (startButton) { 
-        startButton.onclick = async () => { /* ... (same microphone access logic) ... */ 
+        startButton.onclick = async () => { 
             recordingError.textContent = ''; resetLiveResults();
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -196,7 +207,7 @@
                 mediaRecorder.start(); recordingStatus.textContent = 'Status: Recording...';
                 startButton.disabled = true; stopButton.disabled = false; processRecordingButton.disabled = true;
                 audioPlayback.style.display = 'none'; startTimer();
-                if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = true; // Disable title input during recording
+                if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = true; 
             } catch (err) {
                 console.error("Mic error:", err); recordingStatus.textContent = 'Status: Mic error.';
                 recordingError.textContent = 'Mic access error: ' + err.name + ": " + err.message;
@@ -207,51 +218,41 @@
         stopButton.onclick = () => { 
             if (mediaRecorder && mediaRecorder.state === "recording") {
                 mediaRecorder.stop(); startButton.disabled = false; stopButton.disabled = true;
-                if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = false; // Re-enable title input
+                if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = false; 
             }
         };
         processRecordingButton.onclick = async () => {
             if (!audioBlob) { recordingError.textContent = 'No recording.'; return; }
-            
             const userProvidedTitle = meetingTitleRecordInput ? meetingTitleRecordInput.value.trim() : "";
             if(liveMeetingTitleDisplay) liveMeetingTitleDisplay.textContent = userProvidedTitle || "Live Recording";
-
-
-            resetLiveResults(); // Clear previous results before showing new ones
+            resetLiveResults(); 
             processRecordingButton.disabled = true; startButton.disabled = true; stopButton.disabled = true;
             if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = true;
             recordLoadingSpinner.style.display = 'inline-block'; recordingStatus.textContent = 'Status: Processing...';
             liveMeetingResultsDiv.style.display = 'block';
-
             const formData = new FormData();
             const recordingFilename = `live_recording_${new Date().toISOString().replace(/[-:.]/g, "").slice(0,-4)}.webm`;
             formData.append('audio_file', audioBlob, recordingFilename);
-            // Append the meeting title to the FormData
             formData.append('meeting_title_record', userProvidedTitle);
-
-
             try {
                 const response = await fetch("{{ url_for('process_recorded_audio') }}", { method: 'POST', body: formData });
                 const result = await response.json();
                 if (response.ok && result.status === 'success') {
                     recordingStatus.textContent = 'Status: Processed!'; 
                     if(fullMeetingDetailsLink) fullMeetingDetailsLink.href = result.redirect_url;
-                    if(liveMeetingTitleDisplay && result.meeting_title) liveMeetingTitleDisplay.textContent = result.meeting_title;
-                    
+                    if(liveMeetingTitleDisplay && result.meeting_title) liveMeetingTitleDisplay.textContent = result.meeting_title; 
                     if(liveSummaryP) liveSummaryP.textContent = result.summary || "N/A";
                     if (liveSummaryP && result.summary && result.summary.startsWith("ERROR:")) liveSummaryP.classList.add("error-message");
-                    
                     if (liveActionItemsDiv && result.action_items && result.action_items.length > 0) {
                         let aiHtml = '<table><thead><tr><th>Task</th><th>Owner</th><th>Due</th></tr></thead><tbody>';
                         result.action_items.forEach(i => { aiHtml += `<tr><td>${i.task||'N/A'}</td><td>${i.owner||'N/A'}</td><td>${i.due_date||'N/A'}</td></tr>`;});
                         aiHtml += '</tbody></table>'; liveActionItemsDiv.innerHTML = aiHtml;
                     } else if(liveActionItemsDiv) { liveActionItemsDiv.innerHTML = `<p>No action items ${result.nlp_error ? ' (NLP issue).' : 'identified.'}</p>`; }
-
                     if (liveDecisionsDiv && result.decisions && result.decisions.length > 0) {
-                        let dHtml = '<ul>'; result.decisions.forEach(d => { dHtml += `<li>${d.decision_text} <span class="status status-decision-${(d.status||'open').toLowerCase()}">(${(d.status||'open')})</span></li>`; });
+                        let dHtml = '<ul>'; result.decisions.forEach(d_item => { dHtml += `<li>${d_item.decision_text} <span class="status status-decision-${(d_item.status||'open').toLowerCase()}">(${(d_item.status||'open')})</span></li>`; });
                         dHtml += '</ul>'; liveDecisionsDiv.innerHTML = dHtml;
                     } else if(liveDecisionsDiv) { liveDecisionsDiv.innerHTML = `<p>No decisions ${result.nlp_error ? ' (NLP issue).' : 'identified.'}</p>`; }
-                } else {
+                } else { 
                     let errorMsg = result.message || `Server error ${response.status}.`;
                     if(recordingError) recordingError.textContent = 'Processing error: ' + errorMsg; 
                     if(recordingStatus) recordingStatus.textContent = 'Status: Failed.';
@@ -259,16 +260,16 @@
                     if(liveActionItemsDiv) liveActionItemsDiv.innerHTML = '<p>N/A</p>'; 
                     if(liveDecisionsDiv) liveDecisionsDiv.innerHTML = '<p>N/A</p>';
                 }
-            } catch (err) {
+            } catch (err) { 
                 console.error('Fetch/JSON error:', err); 
                 if(recordingError) recordingError.textContent = 'Network/Response error.';
                 if(recordingStatus) recordingStatus.textContent = 'Status: Failed.'; 
                 if(liveSummaryP) {liveSummaryP.textContent = 'Network/Response error.'; liveSummaryP.classList.add("error-message");}
-            } finally {
+            } finally { 
                 if(recordLoadingSpinner) recordLoadingSpinner.style.display = 'none'; 
                 if(startButton) startButton.disabled = false; 
                 if(processRecordingButton) processRecordingButton.disabled = (audioBlob === null); 
-                if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = false; // Re-enable after processing attempt
+                if(meetingTitleRecordInput) meetingTitleRecordInput.disabled = false; 
             }
         };
     }

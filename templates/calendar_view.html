@@ -6,7 +6,7 @@
     <title>Meeting Calendar - Custom</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        /* Custom Calendar Styles */
+        /* Your existing custom calendar styles - should be fine */
         .calendar-wrapper { display: flex; flex-direction: column; gap: 20px; }
         @media (min-width: 768px) { .calendar-wrapper { flex-direction: row; } }
         .custom-calendar-container { min-width: 300px; flex-basis: 380px; flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;}
@@ -14,51 +14,24 @@
         .calendar-header button { background-color: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
         .calendar-header button:hover { background-color: #0056b3; }
         .calendar-header #monthYearDisplay { font-size: 1.2em; font-weight: bold; }
-        .calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; /* Helps with consistent cell widths */ }
-        .calendar-table th, .calendar-table td { text-align: center; padding: 0; /* Padding will be on inner div */ border: 1px solid #eee; }
+        .calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .calendar-table th, .calendar-table td { text-align: center; border: 1px solid #eee; }
         .calendar-table th { background-color: #f8f9fa; font-size: 0.9em; padding: 8px 0; }
-        .calendar-table td { cursor: pointer; height: 70px; /* Increased height for event titles */ vertical-align: top; font-size:0.9em; position: relative; }
+        .calendar-table td { cursor: pointer; height: 75px; vertical-align: top; font-size:0.9em; position: relative; padding:0; }
         .calendar-table td:hover { background-color: #e9ecef; }
-        .calendar-table td.today { background-color: #fff3cd; }
+        .calendar-table td.today .calendar-day-number { background-color: #fff3cd; border-radius: 50%; width: 24px; height: 24px; line-height: 24px; display:inline-block; margin: 2px auto;}
         .calendar-table td.selected-day { background-color: #007bff !important; color: white !important; }
-        .calendar-table td.selected-day .calendar-day-number { font-weight: bold; }
+        .calendar-table td.selected-day .calendar-day-number { color: white; background-color: transparent !important; } /* Number color on selected day */
         .calendar-table td.other-month .calendar-day-number { color: #aaa; }
-        .calendar-table td.other-month .calendar-day-event-title { display:none; } /* Hide events from other months */
-        
-        .calendar-day-content { /* New div to hold number and events */
-            padding: 5px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center; /* Center day number */
-        }
-        .calendar-day-number {
-            font-weight: bold;
-            margin-bottom: 3px; /* Space between number and events */
-        }
-        .calendar-day-event-title {
-            font-size: 0.70em; /* Smaller for fitting in cell */
-            color: #0069d9;    /* Darker blue for text */
-            background-color: #e7f3ff; /* Light blue background for event */
-            padding: 1px 3px;
-            margin-top: 1px;
-            border-radius: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 90%; /* Take most of cell width */
-            text-align: left;
-            box-sizing: border-box;
-        }
-        .calendar-table td.selected-day .calendar-day-event-title {
-            color: #007bff; 
-            background-color: #cce5ff; /* Different shade for selected day's events */
-        }
-        .calendar-table td.today .calendar-day-event-title {
-             background-color: #ffeeba; /* Match today's cell for events */
-             color: #856404;
-        }
-
+        .calendar-table td.other-month .calendar-day-event-title { display:none; }
+        .calendar-day-content { padding: 4px; height: 100%; display: flex; flex-direction: column; align-items: center; box-sizing: border-box;}
+        .calendar-day-number { font-weight: bold; display: block; margin-bottom: 2px; }
+        .calendar-day-event-titles-container { margin-top: 0px; width: 100%; max-height: calc(100% - 25px); overflow-y: auto; text-align: left;}
+        .calendar-table td.has-meeting .calendar-day-number::after { content: '●'; display: inline-block; font-size: 0.7em; color: #007bff; margin-left: 3px; vertical-align: top;}
+        .calendar-table td.selected-day.has-meeting .calendar-day-number::after { color: white; }
+        .calendar-day-event-title { font-size: 0.70em; color: #0069d9; background-color: #e7f3ff; padding: 1px 3px; margin-top: 1px; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: calc(100% - 6px); box-sizing: border-box; line-height: 1.3;}
+        .calendar-table td.selected-day .calendar-day-event-title { color: #0056b3; background-color: #b8daff; }
+        .calendar-table td.today .calendar-day-event-title { background-color: #ffeeba; color: #856404; }
 
         /* Panel Styles (same as before) */
         #meetingDetailsPanel { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; min-height: 200px; }
@@ -124,7 +97,6 @@
         let currentMonthDate = new Date(); 
         const meetingsByDateGlobal = JSON.parse('{{ meetings_by_date_json | safe }}');
 
-        // Cache DOM Elements
         const calendarBody = document.getElementById('calendarBody');
         const monthYearDisplay = document.getElementById('monthYearDisplay');
         const selectedDateDisplay = document.getElementById('selectedDateDisplay');
@@ -140,24 +112,24 @@
         const decisionCountSpan = document.getElementById('decisionCount');
         const processedMeetingInfoDiv = document.getElementById('processedMeetingInfo');
 
-        function renderCalendar(date) {
+        function renderCalendar(dateToRender) {
             calendarBody.innerHTML = ''; 
-            const year = date.getFullYear();
-            const month = date.getMonth(); // 0-11
+            const year = dateToRender.getFullYear();
+            const month = dateToRender.getMonth(); 
 
-            monthYearDisplay.textContent = `${date.toLocaleString('default', { month: 'long' })} ${year}`;
+            monthYearDisplay.textContent = `${dateToRender.toLocaleString('default', { month: 'long' })} ${year}`;
 
             const firstDayOfMonth = new Date(year, month, 1);
             const lastDayOfMonth = new Date(year, month + 1, 0);
             const daysInMonth = lastDayOfMonth.getDate();
-            const startingDay = firstDayOfMonth.getDay(); // 0 for Sunday
+            const startingDay = firstDayOfMonth.getDay(); 
 
             let dateCounter = 1;
             for (let i = 0; i < 6; i++) { 
                 const row = document.createElement('tr');
                 for (let j = 0; j < 7; j++) {
                     const cell = document.createElement('td');
-                    const dayContentDiv = document.createElement('div'); // Container for number and events
+                    const dayContentDiv = document.createElement('div');
                     dayContentDiv.classList.add('calendar-day-content');
 
                     if (i === 0 && j < startingDay) {
@@ -178,17 +150,21 @@
                             cell.classList.add('today');
                         }
 
-                        // Display meeting titles within the cell
                         if (meetingsByDateGlobal[cellDateStr] && meetingsByDateGlobal[cellDateStr].length > 0) {
-                            cell.classList.add('has-meeting'); // For the dot indicator via CSS ::after
-                            meetingsByDateGlobal[cellDateStr].slice(0, 2).forEach(meeting => { // Show max 2 titles
+                            cell.classList.add('has-meeting'); 
+                            const eventTitlesContainer = document.createElement('div');
+                            eventTitlesContainer.classList.add('calendar-day-event-titles-container');
+                            
+                            meetingsByDateGlobal[cellDateStr].slice(0, 2).forEach(meeting => { 
                                 const eventTitleDiv = document.createElement('div');
                                 eventTitleDiv.classList.add('calendar-day-event-title');
-                                let titleText = meeting.display_title || "Meeting"; // Fallback
-                                eventTitleDiv.textContent = titleText.substring(0, 12) + (titleText.length > 12 ? "..." : "");
-                                eventTitleDiv.title = titleText; // Full title on hover
-                                dayContentDiv.appendChild(eventTitleDiv);
+                                // ** Use meeting.display_title which is prepared by app.py and robustly fallback **
+                                let titleText = meeting.display_title || "Event"; // Fallback if display_title is missing
+                                eventTitleDiv.textContent = titleText.substring(0, 10) + (titleText.length > 10 ? "..." : "");
+                                eventTitleDiv.title = titleText; 
+                                eventTitlesContainer.appendChild(eventTitleDiv);
                             });
+                            dayContentDiv.appendChild(eventTitlesContainer);
                         }
 
                         cell.onclick = function() {
@@ -199,7 +175,7 @@
                         };
                         dateCounter++;
                     }
-                    cell.appendChild(dayContentDiv); // Add content div to cell
+                    cell.appendChild(dayContentDiv);
                     row.appendChild(cell);
                 }
                 calendarBody.appendChild(row);
@@ -221,13 +197,12 @@
             meetingsListUl.innerHTML = '<li class="no-meetings-message">Select a date to see meetings.</li>';
             selectedMeetingContentDiv.style.display = 'none';
             detailsSeparator.style.display = 'none';
-            if (selectedDateDisplay && currentMonthDate) {
+            if (selectedDateDisplay && currentMonthDate) { 
                  selectedDateDisplay.textContent = currentMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
             }
         }
 
         function displayMeetingsForDate(dateStr){
-            // This function logic is from your provided HTML (should be correct)
             console.log("Displaying meetings for date:", dateStr);
             if (!meetingsListUl || !selectedDateDisplay || !selectedMeetingContentDiv || !detailsSeparator) { 
                 console.error("UI elements for date display not found!"); return; 
@@ -241,16 +216,20 @@
             if (meetingsOnDate.length > 0) {
                 meetingsOnDate.forEach(meeting => { 
                     const li = document.createElement('li');
+                    // ** Use meeting.display_title **
                     li.textContent = meeting.display_title || "Untitled Meeting"; 
                     li.dataset.meetingId = meeting.id;
+                    
                     const timeToDisplay = meeting.event_time_iso; 
                     const timeSpan = document.createElement('span'); timeSpan.className = 'meeting-time';
                     timeSpan.textContent = timeToDisplay ? ` (${new Date(timeToDisplay).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` : '';
                     li.appendChild(timeSpan);
+
                     const statusIndicator = document.createElement('span'); 
                     statusIndicator.className = `status status-inline status-${(meeting.processing_status || 'unknown').replace(' ', '-').toLowerCase()}`; 
                     statusIndicator.textContent = meeting.processing_status || 'Unknown';
                     li.appendChild(statusIndicator);
+                    
                     li.onclick = () => fetchMeetingDetails(meeting.id, li);
                     meetingsListUl.appendChild(li);
                 });
@@ -261,33 +240,41 @@
         }
 
         async function fetchMeetingDetails(meetingId, listItemToSelect) {
-            // This function logic is from your provided HTML (should be correct)
             console.log("Fetching details for meeting ID:", meetingId);
             if (meetingsListUl) meetingsListUl.querySelectorAll('li').forEach(li => li.classList.remove('selected-meeting-item'));
             if(listItemToSelect) listItemToSelect.classList.add('selected-meeting-item');
+            
             selectedMeetingContentDiv.style.display = 'block'; 
             detailsSeparator.style.display = 'block';
             selectedMeetingTitleSpan.textContent = "Loading..."; 
+            
             if(processedMeetingInfoDiv) processedMeetingInfoDiv.style.display = 'none'; 
             if(meetingSummaryP) { meetingSummaryP.textContent = ""; meetingSummaryP.classList.remove("error-message"); }
             if(meetingActionItemsDiv) meetingActionItemsDiv.innerHTML = ""; 
             if(meetingDecisionsDiv) meetingDecisionsDiv.innerHTML = "";
             if(actionItemCountSpan) actionItemCountSpan.textContent = "0";
             if(decisionCountSpan) decisionCountSpan.textContent = "0";
+
             try {
                 const response = await fetch(`/api/meeting_details/${meetingId}`);
                 if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}, message: ${await response.text()}`); }
                 const details = await response.json(); 
                 console.log("Fetched details:", details);
+
+                // ** Use meeting.meeting_title from details **
                 if(selectedMeetingTitleSpan) selectedMeetingTitleSpan.textContent = details.meeting.meeting_title || details.meeting.filename || "Meeting Details";
                 if(fullDetailsLink) fullDetailsLink.href = `/meeting/${details.meeting.id}`;
+                
                 if(processedMeetingInfoDiv) processedMeetingInfoDiv.style.display = 'block';
                 if(meetingSummaryP) meetingSummaryP.textContent = details.meeting.summary || "No summary available.";
                 if(meetingSummaryP && details.meeting.summary && details.meeting.summary.startsWith("ERROR:")) meetingSummaryP.classList.add("error-message");
+                
                 if(actionItemCountSpan) actionItemCountSpan.textContent = details.action_items.length; 
                 if(meetingActionItemsDiv) meetingActionItemsDiv.innerHTML = details.action_items.length > 0 ? `<table><thead><tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>${details.action_items.map(item => `<tr><td>${item.task||'N/A'}</td><td>${item.owner||'N/A'}</td><td>${item.due_date||'N/A'}</td><td><span class="status status-${(item.status||'N/A').toLowerCase()}">${item.status||'N/A'}</span></td></tr>`).join('')}</tbody></table>` : '<p>No action items.</p>';
+                
                 if(decisionCountSpan) decisionCountSpan.textContent = details.decisions.length;
                 if(meetingDecisionsDiv) meetingDecisionsDiv.innerHTML = details.decisions.length > 0 ? `<ul>${details.decisions.map(d => `<li>${d.decision_text} <span class="status status-decision-${(d.status||'open').toLowerCase()}">(${(d.status||'open')})</span></li>`).join('')}</ul>` : '<p>No decisions.</p>';
+                
             } catch (error) {
                 console.error("Could not fetch meeting details:", error);
                 if(processedMeetingInfoDiv) processedMeetingInfoDiv.style.display = 'block'; 
@@ -296,20 +283,14 @@
             }
         }
 
-        // Initialize after DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            // ** CALL renderCalendar here for initial display **
             renderCalendar(currentMonthDate); 
-
             const today = new Date();
             const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             if (selectedDateDisplay) selectedDateDisplay.textContent = todayStr;
             displayMeetingsForDate(todayStr);
-            
-            // Mark today as selected in the newly rendered calendar
-            const todayCell = calendarBody.querySelector(`.calendar-table td.today`); // More specific selector
+            const todayCell = calendarBody.querySelector(`td[data-date="${todayStr}"]`); // Use data-date to find today's cell
             if (todayCell) {
-                // Remove from any other cell first
                 const prevSelected = calendarBody.querySelector('.selected-day');
                 if (prevSelected) prevSelected.classList.remove('selected-day');
                 todayCell.classList.add('selected-day');

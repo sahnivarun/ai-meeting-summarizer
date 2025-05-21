@@ -656,3 +656,32 @@ details summary:hover {
 .status-inline { padding: 2px 6px; font-size: 0.75em !important; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
 .status-decision-open { background-color: #ffc107; color: #212529; }
 .status-decision-implemented { background-color: #28a745; color: white; }
+
+/* static/style.css */
+/* ... (all your existing styles) ... */
+
+/* Form Group for consistent spacing */
+.form-group {
+    margin-bottom: 15px;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+.form-group input[type="text"],
+.form-group input[type="file"],
+.form-group textarea {
+    width: 100%; /* Make input fields and textarea take full width of their container */
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Important for width calculation */
+}
+
+/* Specific to the transcript textarea */
+#textTab textarea[name="transcript_text"] {
+    min-height: 200px; /* Ensure decent height */
+    font-family: monospace; /* Good for code/transcripts */
+    font-size: 0.9em;
+}
