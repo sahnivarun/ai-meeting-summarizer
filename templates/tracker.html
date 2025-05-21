@@ -97,14 +97,12 @@ function filterTable() {
         }
         
         if (statusMatch && ownerMatch) {
-            tr[i].style.display = ""; // Show row if both filters match
+            tr[i].style.display = "";
         }
     }
 }
-// Initial filter application in case a filter is pre-selected or for onload behavior
+
 document.addEventListener('DOMContentLoaded', function() {
-    // If you want to pre-select a filter, e.g., 'pending':
-    // document.getElementById("statusFilter").value = "pending";
     filterTable();
 });
 </script>

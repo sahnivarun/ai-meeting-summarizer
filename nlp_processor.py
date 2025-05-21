@@ -93,10 +93,10 @@ def generate_summary(transcript: str) -> str:
         return "ERROR: Transcript is empty, cannot generate summary."
 
     prompt = f"""
-    You are an expert meeting summarizer. Analyze the following transcript and generate a clean, concise summary.
+    You are an expert meeting summarizer. Analyze the following transcript and generate a detailed summary.
     Focus on the key topics discussed, decisions made, and outcomes agreed upon.
 
-    Avoid irrelevant small talk or greetings. Present the summary in 4–8 bullet points if possible.
+    Present the summary in 4–8 bullet points if possible.
     This summary will be used in a dashboard for team tracking, so be objective and informative.
 
     Transcript:
@@ -125,7 +125,7 @@ def extract_action_items(transcript: str) -> list:
 
     prompt = f"""
     You are a smart assistant extracting action items from a meeting transcript.
-    Identify **all** action items clearly discussed or implied. For each item, return a JSON object with:
+    Identify **all** action items discussed or implied. For each item, return a JSON object with:
     - `task`: the task or follow-up action
     - `owner`: person responsible (null or "" if not mentioned)
     - `due_date`: deadline or timeline (null or "N/A" if not mentioned)
@@ -141,7 +141,7 @@ def extract_action_items(transcript: str) -> list:
     ...
     ]
 
-    If no action items are present, return an empty list `[]`.
+    If no action items are present, return an empty list `[]`. Please try to identify the action items atleast 1-2 from the summary, the more the better.
 
     Transcript:
     ---

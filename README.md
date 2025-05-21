@@ -17,7 +17,7 @@ An AI-powered full-stack application that transcribes meeting audio, summarizes 
 
 1. Clone the Repository
 
-git clone <your-repo-link>
+git clone <https://github.com/sahnivarun/ai-meeting-summarizer>
 cd ai-meeting-summarizer
 
 2. Set Up Python Virtual Environment (Optional but Recommended)
