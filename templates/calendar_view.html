@@ -6,7 +6,7 @@
     <title>Meeting Calendar - Custom</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        /* Your existing custom calendar styles - should be fine */
+        /* Your existing custom calendar styles - they should be fine */
         .calendar-wrapper { display: flex; flex-direction: column; gap: 20px; }
         @media (min-width: 768px) { .calendar-wrapper { flex-direction: row; } }
         .custom-calendar-container { min-width: 300px; flex-basis: 380px; flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;}
@@ -21,7 +21,7 @@
         .calendar-table td:hover { background-color: #e9ecef; }
         .calendar-table td.today .calendar-day-number { background-color: #fff3cd; border-radius: 50%; width: 24px; height: 24px; line-height: 24px; display:inline-block; margin: 2px auto;}
         .calendar-table td.selected-day { background-color: #007bff !important; color: white !important; }
-        .calendar-table td.selected-day .calendar-day-number { color: white; background-color: transparent !important; } /* Number color on selected day */
+        .calendar-table td.selected-day .calendar-day-number { color: white; background-color: transparent !important; }
         .calendar-table td.other-month .calendar-day-number { color: #aaa; }
         .calendar-table td.other-month .calendar-day-event-title { display:none; }
         .calendar-day-content { padding: 4px; height: 100%; display: flex; flex-direction: column; align-items: center; box-sizing: border-box;}
@@ -33,7 +33,7 @@
         .calendar-table td.selected-day .calendar-day-event-title { color: #0056b3; background-color: #b8daff; }
         .calendar-table td.today .calendar-day-event-title { background-color: #ffeeba; color: #856404; }
 
-        /* Panel Styles (same as before) */
+        /* Panel Styles */
         #meetingDetailsPanel { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; min-height: 200px; }
         @media (min-width: 768px) { #meetingDetailsPanel { margin-top: 0; flex-basis: 550px; flex-grow: 2; } }
         #meetingDetailsPanel h3, #meetingDetailsPanel h4 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
@@ -116,15 +116,13 @@
             calendarBody.innerHTML = ''; 
             const year = dateToRender.getFullYear();
             const month = dateToRender.getMonth(); 
-
             monthYearDisplay.textContent = `${dateToRender.toLocaleString('default', { month: 'long' })} ${year}`;
-
             const firstDayOfMonth = new Date(year, month, 1);
             const lastDayOfMonth = new Date(year, month + 1, 0);
             const daysInMonth = lastDayOfMonth.getDate();
             const startingDay = firstDayOfMonth.getDay(); 
-
             let dateCounter = 1;
+
             for (let i = 0; i < 6; i++) { 
                 const row = document.createElement('tr');
                 for (let j = 0; j < 7; j++) {
@@ -261,7 +259,7 @@
                 const details = await response.json(); 
                 console.log("Fetched details:", details);
 
-                // ** Use meeting.meeting_title from details **
+                // ** Use meeting.meeting_title from details for the panel title **
                 if(selectedMeetingTitleSpan) selectedMeetingTitleSpan.textContent = details.meeting.meeting_title || details.meeting.filename || "Meeting Details";
                 if(fullDetailsLink) fullDetailsLink.href = `/meeting/${details.meeting.id}`;
                 
@@ -283,13 +281,14 @@
             }
         }
 
+        // Initialize after DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            renderCalendar(currentMonthDate); 
+            renderCalendar(currentMonthDate); // Call renderCalendar to draw the initial month
             const today = new Date();
             const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             if (selectedDateDisplay) selectedDateDisplay.textContent = todayStr;
             displayMeetingsForDate(todayStr);
-            const todayCell = calendarBody.querySelector(`td[data-date="${todayStr}"]`); // Use data-date to find today's cell
+            const todayCell = calendarBody.querySelector(`td[data-date="${todayStr}"]`); // Use data-date
             if (todayCell) {
                 const prevSelected = calendarBody.querySelector('.selected-day');
                 if (prevSelected) prevSelected.classList.remove('selected-day');

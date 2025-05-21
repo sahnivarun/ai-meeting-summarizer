@@ -45,35 +45,32 @@ def get_db():
     if db is None: db = g._database = get_db_connection()
     return db
 
-def process_audio_file(filepath, actual_stored_filename, user_provided_title=None):
+# --- MODIFIED HELPER FUNCTION FOR AUDIO PROCESSING ---
+def process_audio_file(filepath, actual_stored_filename, user_provided_title=None, original_uploaded_filename_for_default_title=None):
     meeting_id = None; summary_result = "ERROR: Initial processing error." 
     action_items_data = []; decisions_from_nlp = []; nlp_error_occurred = True 
     
-    final_meeting_title = actual_stored_filename # Default if user_provided_title is empty
+    current_time_for_title = datetime.now()
+    current_dt_str = current_time_for_title.strftime('%Y-%m-%d %H:%M')
+
     if user_provided_title and user_provided_title.strip():
         final_meeting_title = user_provided_title.strip()
+        logger.info(f"User provided title: '{final_meeting_title}'")
     else:
-        try:
-            db_temp = get_db(); cursor_temp = db_temp.cursor()
-            cursor_temp.execute("SELECT COUNT(id) FROM meetings")
-            count = cursor_temp.fetchone()[0]
-            if "live_recording" in actual_stored_filename.lower():
-                final_meeting_title = f"Live Recording {count + 1}"
-            else:
-                final_meeting_title = f"Uploaded Meeting {count + 1}"
-            logger.info(f"No user title for audio, generated default: '{final_meeting_title}' for file '{actual_stored_filename}'")
-        except Exception as e_count:
-            logger.error(f"Error generating default meeting title for audio: {e_count}")
-            # Fallback to filename if count fails (already set as default above)
+        if "live_recording" in actual_stored_filename.lower():
+            final_meeting_title = f"Live Recording ({current_dt_str})"
+        elif original_uploaded_filename_for_default_title:
+            final_meeting_title = f"{original_uploaded_filename_for_default_title} ({current_dt_str})"
+        else: 
+            final_meeting_title = f"Uploaded File ({current_dt_str})"
+        logger.info(f"No user title for audio, generated default: '{final_meeting_title}' (based on file: '{actual_stored_filename}')")
 
     try:
         db = get_db(); cursor = db.cursor()
-        # `filename` column stores the actual disk filename
-        # `meeting_title` stores the user-friendly or generated title
         cursor.execute("""
             INSERT INTO meetings (filename, processing_status, upload_time, meeting_title) 
             VALUES (?, ?, ?, ?)
-            """, (actual_stored_filename, 'uploaded', datetime.now(), final_meeting_title))
+            """, (actual_stored_filename, 'uploaded', current_time_for_title, final_meeting_title))
         meeting_id = cursor.lastrowid; db.commit()
         logger.info(f"PROCESSED: Meeting record created ID: {meeting_id} for file '{actual_stored_filename}' with DB title '{final_meeting_title}'.")
         
@@ -82,9 +79,8 @@ def process_audio_file(filepath, actual_stored_filename, user_provided_title=Non
 
         if not transcript_text:
             summary_result = 'ERROR: Transcription failed.'
-            # Update meeting_title here as well if it was a default, though it's less likely to change if transcription fails
-            cursor.execute("UPDATE meetings SET processing_status = ?, transcript = ?, summary = ?, meeting_title = ? WHERE id = ?", 
-                           ('error', 'Transcription failed.', summary_result, final_meeting_title, meeting_id)); db.commit()
+            cursor.execute("UPDATE meetings SET processing_status = ?, transcript = ?, summary = ? WHERE id = ?", 
+                           ('error', 'Transcription failed.', summary_result, meeting_id)); db.commit() # meeting_title already set
             logger.error(f"PROCESSED: Transcription failed for ID {meeting_id}.")
             return {'status': 'error', 'message': summary_result, 'meeting_id': meeting_id, 'summary':summary_result, 'action_items':[], 'decisions':[], 'meeting_title': final_meeting_title}
         
@@ -99,17 +95,16 @@ def process_audio_file(filepath, actual_stored_filename, user_provided_title=Non
         
         current_db_status = 'error' if nlp_error_occurred else 'completed'
         
-        is_default_title_check = final_meeting_title == actual_stored_filename or \
-                           final_meeting_title.startswith("Meeting ") or \
-                           final_meeting_title.startswith("Live Recording ") or \
-                           final_meeting_title.startswith("Uploaded Meeting ")
-
-        if is_default_title_check and not nlp_error_occurred and summary_result and not summary_result.startswith("ERROR:") and len(summary_result) > 5:
-            potential_title = " ".join(summary_result.split()[:6]) 
-            if len(potential_title) > 5: 
-                final_meeting_title = potential_title + "..." 
-                logger.info(f"Updated meeting_title for ID {meeting_id} from summary to: '{final_meeting_title}'")
-
+        # **MODIFICATION: Remove or comment out the logic that updates final_meeting_title from summary**
+        # was_generated_title = f"({current_dt_str})" in final_meeting_title 
+        # if was_generated_title and not nlp_error_occurred and summary_result and not summary_result.startswith("ERROR:") and len(summary_result) > 5:
+        #     potential_title = " ".join(summary_result.split()[:6]) 
+        #     if len(potential_title) > 5: 
+        #         final_meeting_title = potential_title + "..." 
+        #         logger.info(f"Updated meeting_title for ID {meeting_id} from summary to: '{final_meeting_title}'")
+        # **END MODIFICATION**
+        
+        # The final_meeting_title is now either user-provided or the "Mode (timestamp)" default.
         cursor.execute("UPDATE meetings SET summary = ?, processing_status = ?, meeting_title = ? WHERE id = ?", 
                        (summary_result, current_db_status, final_meeting_title, meeting_id))
         
@@ -122,7 +117,9 @@ def process_audio_file(filepath, actual_stored_filename, user_provided_title=Non
         cursor.execute("SELECT id, decision_text, status, resolution_notes FROM decisions WHERE meeting_id = ?", (meeting_id,))
         processed_decisions_for_return = [dict(row) for row in cursor.fetchall()]
         logger.info(f"PROCESSED: NLP stage for ID {meeting_id} finished. Error: {nlp_error_occurred}. Summary: '{summary_result[:50]}...'")
-        return {'status': 'success', 'meeting_id': meeting_id, 'summary': summary_result, 'action_items': action_items_data, 'decisions': processed_decisions_for_return, 'nlp_error': nlp_error_occurred, 'filename': actual_stored_filename, 'meeting_title': final_meeting_title}
+        return {'status': 'success', 'meeting_id': meeting_id, 'summary': summary_result, 
+                'action_items': action_items_data, 'decisions': processed_decisions_for_return, 
+                'nlp_error': nlp_error_occurred, 'filename': actual_stored_filename, 'meeting_title': final_meeting_title}
     except openai.AuthenticationError as e:
         error_msg = f"ERROR: OpenAI Auth Error: {e}"; logger.critical(f"PROCESSED (ID {meeting_id or 'N/A'}): {error_msg}", exc_info=False)
         if meeting_id:
@@ -140,30 +137,24 @@ def process_audio_file(filepath, actual_stored_filename, user_provided_title=Non
 def process_text_input(transcript_text, user_provided_title=None):
     meeting_id = None; summary_result = "ERROR: Initial processing error." 
     action_items_data = []; decisions_from_nlp = []; nlp_error_occurred = True
+    current_time_for_title = datetime.now()
+    current_dt_str = current_time_for_title.strftime('%Y-%m-%d %H:%M')
 
-    final_meeting_title = user_provided_title if user_provided_title and user_provided_title.strip() else None
-    if not final_meeting_title:
-        try:
-            db_temp = get_db(); cursor_temp = db_temp.cursor()
-            cursor_temp.execute("SELECT COUNT(id) FROM meetings")
-            count = cursor_temp.fetchone()[0]
-            final_meeting_title = f"Text Input Meeting {count + 1}"
-            logger.info(f"No user title for text input, generated default: '{final_meeting_title}'")
-        except Exception as e_count:
-            logger.error(f"Error generating default title for text input: {e_count}")
-            final_meeting_title = f"Pasted Transcript {datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-    # **MODIFICATION: Use a placeholder for filename if schema requires NOT NULL**
-    # If your database.py ensures filename allows NULL, this can be None.
-    # To be safe against older schemas or strict NOT NULL, provide a placeholder.
-    placeholder_filename = f"text_input_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
+    if user_provided_title and user_provided_title.strip():
+        final_meeting_title = user_provided_title.strip()
+        logger.info(f"User provided title for text input: '{final_meeting_title}'")
+    else:
+        final_meeting_title = f"Meeting Transcription ({current_dt_str})"
+        logger.info(f"No user title for text input, generated default: '{final_meeting_title}'")
+    
+    placeholder_filename = f"text_input_{current_time_for_title.strftime('%Y%m%d%H%M%S')}.txt"
 
     try:
         db = get_db(); cursor = db.cursor()
         cursor.execute("""
             INSERT INTO meetings (filename, transcript, processing_status, upload_time, meeting_title) 
             VALUES (?, ?, ?, ?, ?)
-            """, (placeholder_filename, transcript_text, 'processing_nlp', datetime.now(), final_meeting_title))
+            """, (placeholder_filename, transcript_text, 'processing_nlp', current_time_for_title, final_meeting_title))
         meeting_id = cursor.lastrowid; db.commit()
         logger.info(f"TEXT_PROC: Meeting record ID: {meeting_id}, Title: '{final_meeting_title}', Placeholder Filename: '{placeholder_filename}'. Status 'processing_nlp'.")
 
@@ -173,17 +164,17 @@ def process_text_input(transcript_text, user_provided_title=None):
         nlp_error_occurred = summary_result.startswith("ERROR:")
         current_db_status = 'error' if nlp_error_occurred else 'completed'
         
-        is_default_title_check = final_meeting_title.startswith("Text Input Meeting ") or \
-                                   final_meeting_title.startswith("Pasted Transcript ")
-
-        if is_default_title_check and not nlp_error_occurred and summary_result and not summary_result.startswith("ERROR:") and len(summary_result) > 5:
-            potential_title = " ".join(summary_result.split()[:6]) 
-            if len(potential_title) > 5: 
-                final_meeting_title = potential_title + "..." 
-                logger.info(f"TEXT_PROC: Auto-updated meeting_title for ID {meeting_id} from summary to: '{final_meeting_title}'")
+        # **MODIFICATION: Remove or comment out the logic that updates final_meeting_title from summary**
+        # was_generated_title = f"({current_dt_str})" in final_meeting_title 
+        # if was_generated_title and not nlp_error_occurred and summary_result and not summary_result.startswith("ERROR:") and len(summary_result) > 5:
+        #     potential_title = " ".join(summary_result.split()[:6]) 
+        #     if len(potential_title) > 5: 
+        #         final_meeting_title = potential_title + "..." 
+        #         logger.info(f"TEXT_PROC: Auto-updated meeting_title for ID {meeting_id} from summary to: '{final_meeting_title}'")
+        # **END MODIFICATION**
         
         cursor.execute("UPDATE meetings SET summary = ?, processing_status = ?, meeting_title = ? WHERE id = ?", 
-                       (summary_result, current_db_status, final_meeting_title, meeting_id))
+                       (summary_result, current_db_status, final_meeting_title, meeting_id)) # Use the already set final_meeting_title
         
         for item in action_items_data: 
             cursor.execute("INSERT INTO action_items (meeting_id, task, owner, due_date) VALUES (?, ?, ?, ?)", (meeting_id, item.get('task'), item.get('owner'), item.get('due_date')))
@@ -194,8 +185,8 @@ def process_text_input(transcript_text, user_provided_title=None):
         cursor.execute("SELECT id, decision_text, status, resolution_notes FROM decisions WHERE meeting_id = ?", (meeting_id,))
         processed_decisions_for_return = [dict(row) for row in cursor.fetchall()]
         logger.info(f"TEXT_PROC: NLP stage for ID {meeting_id} finished. Error: {nlp_error_occurred}.")
-        return {'status': 'success', 'meeting_id': meeting_id, 'summary': summary_result, 'action_items': action_items_data, 'decisions': processed_decisions_for_return, 'nlp_error': nlp_error_occurred, 'filename': placeholder_filename, 'meeting_title': final_meeting_title} # Return placeholder filename
-
+        return {'status': 'success', 'meeting_id': meeting_id, 'summary': summary_result, 'action_items': action_items_data, 'decisions': processed_decisions_for_return, 'nlp_error': nlp_error_occurred, 'filename': placeholder_filename, 'meeting_title': final_meeting_title}
+    # ... (rest of process_text_input's except blocks - same as your provided version) ...
     except openai.AuthenticationError as e:
         error_msg = f"ERROR: OpenAI Auth Error: {e}"; logger.critical(f"TEXT_PROC (ID {meeting_id or 'N/A'}): {error_msg}", exc_info=False)
         if meeting_id:
@@ -210,9 +201,10 @@ def process_text_input(transcript_text, user_provided_title=None):
         return {'status': 'error', 'message': f'Unexpected error: {str(e)[:100]}...', 'meeting_id': meeting_id, 'summary':f"Proc. Error: {str(e)[:250]}", 'action_items':[], 'decisions':[], 'meeting_title': final_meeting_title}
 
 
+# --- Routes ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # ... (This route is the same as your last complete version, which correctly handles meeting_title_upload) ...
+    # ... (This route is the same as your last complete version, which correctly passes original_uploaded_filename) ...
     if request.method == 'POST': 
         user_meeting_title_upload = request.form.get('meeting_title_upload', '').strip()
         logger.info(f"Upload: Received meeting_title_upload: '{user_meeting_title_upload}'")
@@ -220,23 +212,27 @@ def index():
         file = request.files['audio_file']
         if file.filename == '': flash('No audio file selected.', 'danger'); return redirect(request.url)
         if file and allowed_file(file.filename):
-            original_filename_display = secure_filename(file.filename) 
-            storage_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{original_filename_display}"
+            original_uploaded_filename = file.filename 
+            secured_basename_tuple = os.path.splitext(secure_filename(original_uploaded_filename)) # secure_filename on base only
+            storage_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secured_basename_tuple[0]}{secured_basename_tuple[1]}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], storage_filename)
             try:
                 if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLOAD_FOLDER'])
-                file.save(filepath); logger.info(f"Uploaded '{original_filename_display}' to {filepath}")
-                result = process_audio_file(filepath, storage_filename, user_meeting_title_upload) 
+                file.save(filepath); logger.info(f"Uploaded '{original_uploaded_filename}' to {filepath} (stored as {storage_filename})")
+                result = process_audio_file(filepath, storage_filename, user_meeting_title_upload, original_uploaded_filename_for_default_title=original_uploaded_filename) 
                 if result['status'] == 'success':
                     display_title = result.get('meeting_title', result.get("filename", "Meeting"))
                     flash_msg = f'Meeting "{display_title}" processed.' + (" Issues with NLP." if result.get('nlp_error') else "")
                     flash(flash_msg, 'warning' if result.get('nlp_error') else 'success')
                     return redirect(url_for('meeting_detail', meeting_id=result['meeting_id']))
                 else:
-                    flash(f"Error processing {original_filename_display}: {result.get('message', 'Unknown error')}", 'danger')
+                    flash(f"Error processing {original_uploaded_filename}: {result.get('message', 'Unknown error')}", 'danger')
                     return redirect(url_for('index'))
-            except Exception as e: logger.error(f"Error handling upload of {original_filename_display}: {e}", exc_info=True); flash(f'Upload Error: {str(e)}', 'danger'); return redirect(request.url)
-        else: flash('File type not allowed or invalid file.', 'warning'); return redirect(request.url)
+            except Exception as e: 
+                logger.error(f"Error handling upload of {original_uploaded_filename}: {e}", exc_info=True)
+                flash(f'Upload Error: {str(e)}', 'danger'); return redirect(request.url)
+        else: 
+            flash('File type not allowed or invalid file.', 'warning'); return redirect(request.url)
     db = get_db(); cursor = db.cursor()
     cursor.execute("SELECT id, filename, upload_time, processing_status, summary, meeting_title FROM meetings ORDER BY upload_time DESC, id DESC")
     meetings_raw = cursor.fetchall()
@@ -258,7 +254,7 @@ def index():
 
 @app.route('/process_recorded_audio', methods=['POST'])
 def process_recorded_audio():
-    # ... (This route is the same as your last complete version, correctly handling meeting_title_record) ...
+    # ... (This route is the same as your last complete version, passes user_meeting_title_record) ...
     user_meeting_title_record = request.form.get('meeting_title_record', '').strip()
     logger.info(f"Record: Received meeting_title_record: '{user_meeting_title_record}'")
     if 'audio_file' not in request.files: return jsonify({'status': 'error', 'message': 'No audio data.'}), 400
@@ -269,7 +265,7 @@ def process_recorded_audio():
     try:
         if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLOAD_FOLDER'])
         file.save(filepath); logger.info(f"Live recording '{actual_stored_filename}' saved to {filepath}")
-        result = process_audio_file(filepath, actual_stored_filename, user_meeting_title_record) 
+        result = process_audio_file(filepath, actual_stored_filename, user_meeting_title_record, original_uploaded_filename_for_default_title=actual_stored_filename) 
         if result['status'] == 'success':
             return jsonify({'status': 'success', 'meeting_id': result['meeting_id'], 'redirect_url': url_for('meeting_detail', meeting_id=result['meeting_id']), 'summary': result.get('summary', "N/A"), 'action_items': result.get('action_items', []), 'decisions': result.get('decisions', []), 'nlp_error': result.get('nlp_error', False), 'meeting_title': result.get('meeting_title', actual_stored_filename) })
         else: return jsonify({'status': 'error', 'message': result.get('message'), 'meeting_id': result.get('meeting_id')}), 500
@@ -277,10 +273,9 @@ def process_recorded_audio():
 
 @app.route('/process_text_transcript', methods=['POST'])
 def process_text_transcript():
-    # ... (This route is the same as the one I provided in the last response) ...
+    # ... (This route is the same as your last complete version) ...
     user_meeting_title = request.form.get('meeting_title_text', '').strip()
     transcript_text = request.form.get('transcript_text', '').strip()
-    logger.info(f"Text Process: Received title='{user_meeting_title}', transcript_length={len(transcript_text)}")
     if not transcript_text: flash('Transcript text cannot be empty.', 'danger'); return redirect(url_for('index'))
     result = process_text_input(transcript_text, user_meeting_title) 
     if result['status'] == 'success':
@@ -288,13 +283,11 @@ def process_text_transcript():
         flash_msg = f'Meeting "{display_title}" (from text) processed.' + (" Issues with NLP." if result.get('nlp_error') else "")
         flash(flash_msg, 'warning' if result.get('nlp_error') else 'success')
         return redirect(url_for('meeting_detail', meeting_id=result['meeting_id']))
-    else:
-        flash(f"Error processing text transcript: {result.get('message', 'Unknown error')}", 'danger')
-        return redirect(url_for('index'))
+    else: flash(f"Error processing text transcript: {result.get('message', 'Unknown error')}", 'danger'); return redirect(url_for('index'))
 
+# ... (All other routes: /tracker, /decision_tracker, /api/meeting_details, /calendar, /meeting/<id>, toggles, delete, .ics - remain IDENTICAL to your provided version)
 @app.route('/tracker') 
 def action_tracker():
-    # ... (This route is the same)
     db = get_db(); cursor = db.cursor()
     query = "SELECT ai.id, ai.task, ai.owner, ai.due_date, ai.status, ai.meeting_id, COALESCE(m.meeting_title, m.filename) as meeting_filename, m.upload_time as meeting_upload_time FROM action_items ai JOIN meetings m ON ai.meeting_id = m.id ORDER BY DATETIME(m.upload_time) DESC, CASE ai.status WHEN 'pending' THEN 1 ELSE 2 END, ai.due_date ASC NULLS LAST;"
     cursor.execute(query); items_raw = cursor.fetchall(); all_items = []
@@ -313,7 +306,6 @@ def action_tracker():
 
 @app.route('/decision_tracker')
 def decision_tracker():
-    # ... (This route is the same)
     db = get_db(); cursor = db.cursor()
     query = "SELECT d.id, d.decision_text, d.status, d.resolution_notes, d.meeting_id, COALESCE(m.meeting_title, m.filename) as meeting_filename, m.upload_time as meeting_upload_time FROM decisions d JOIN meetings m ON d.meeting_id = m.id ORDER BY DATETIME(m.upload_time) DESC, d.id DESC;"
     cursor.execute(query); items_raw = cursor.fetchall(); all_items = []
@@ -332,7 +324,6 @@ def decision_tracker():
 
 @app.route('/api/meeting_details/<int:meeting_id>')
 def api_meeting_details(meeting_id):
-    # ... (This route is the same)
     db = get_db(); cursor = db.cursor()
     m_data = {}; cursor.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,)); m_raw = cursor.fetchone()
     if not m_raw: return jsonify({"error": "Meeting not found"}), 404
@@ -348,7 +339,6 @@ def api_meeting_details(meeting_id):
 
 @app.route('/calendar')
 def calendar_view():
-    # ... (This route is the same - ensures display_title is robustly created)
     db = get_db(); cursor = db.cursor()
     cursor.execute("SELECT id, filename, upload_time, processing_status, meeting_title FROM meetings ORDER BY upload_time DESC")
     meetings_raw = cursor.fetchall(); meetings_by_date = {}
@@ -364,7 +354,7 @@ def calendar_view():
         if isinstance(event_primary_time, datetime):
             date_str = event_primary_time.strftime('%Y-%m-%d')
             if date_str not in meetings_by_date: meetings_by_date[date_str] = []
-            display_title_for_calendar = m.get('meeting_title') or m.get('filename') or "Untitled Event" # Fallback
+            display_title_for_calendar = m.get('meeting_title') or m.get('filename') or "Untitled Event" 
             meeting_entry = {'id': m['id'], 'display_title': display_title_for_calendar, 'processing_status': m.get('processing_status'), 'event_time_iso': event_primary_time.isoformat() }
             if m.get('upload_time') and isinstance(m['upload_time'], datetime): meeting_entry['upload_time_iso'] = m['upload_time'].isoformat()
             meetings_by_date[date_str].append(meeting_entry)
@@ -373,7 +363,6 @@ def calendar_view():
 
 @app.route('/meeting/<int:meeting_id>')
 def meeting_detail(meeting_id):
-    # ... (This route is the same)
     db = get_db(); cursor = db.cursor()
     cursor.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,))
     m_raw = cursor.fetchone()
@@ -393,7 +382,6 @@ def meeting_detail(meeting_id):
 
 @app.route('/action_item/<int:item_id>/toggle', methods=['POST'])
 def toggle_action_item_status(item_id):
-    # ... (This route is the same)
     db=get_db();cur=db.cursor();cur.execute("SELECT status,meeting_id FROM action_items WHERE id=?",(item_id,));item=cur.fetchone()
     if not item:flash('Action item not found.','danger');return redirect(request.referrer or url_for('index'))
     new_s='completed' if item['status']=='pending' else 'pending';cur.execute("UPDATE action_items SET status=? WHERE id=?",(new_s,item_id));db.commit()
@@ -401,7 +389,6 @@ def toggle_action_item_status(item_id):
 
 @app.route('/decision/<int:decision_id>/toggle_status', methods=['POST'])
 def toggle_decision_status(decision_id):
-    # ... (This route is the same)
     db=get_db();cur=db.cursor();new_s_form=request.form.get('new_status');new_s_direct=request.args.get('new_status_direct')
     new_s = 'open'; 
     if new_s_direct:new_s=new_s_direct
@@ -418,7 +405,6 @@ def toggle_decision_status(decision_id):
 
 @app.route('/meeting/<int:meeting_id>/delete', methods=['POST'])
 def delete_meeting(meeting_id):
-    # ... (This route is the same)
     db=get_db();cur=db.cursor();cur.execute("SELECT filename,meeting_title FROM meetings WHERE id=?",(meeting_id,));m_rec=cur.fetchone()
     if not m_rec:flash('Meeting not found.','danger');return redirect(url_for('index'))
     disk_filename=m_rec['filename'];display_title=m_rec['meeting_title'] or disk_filename
@@ -437,7 +423,6 @@ def delete_meeting(meeting_id):
 
 @app.route('/meeting/<int:meeting_id>/calendar') 
 def download_calendar_file(meeting_id):
-    # ... (This route is the same)
     db=get_db();cur=db.cursor()
     cur.execute("SELECT filename FROM meetings WHERE id=?",(meeting_id,))
     if not cur.fetchone():flash('Meeting not found for .ics export.','danger');return redirect(url_for('index'))
