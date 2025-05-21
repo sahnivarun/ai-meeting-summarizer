@@ -558,3 +558,101 @@ details summary:hover {
 #selectedMeetingContent table { font-size: 0.9em; }
 #selectedMeetingContent ul { padding-left: 20px; }
 @media (min-width: 768px) { .calendar-wrapper { flex-direction: row; } #meetingDetailsPanel { margin-top: 0; flex-basis: 550px; flex-grow: 2; } }
+
+/* static/style.css */
+/* ... (all your existing styles) ... */
+
+/* Custom Calendar Styles (Updates for in-cell titles) */
+.calendar-wrapper { display: flex; flex-direction: column; gap: 20px; }
+@media (min-width: 768px) { .calendar-wrapper { flex-direction: row; } }
+.custom-calendar-container { min-width: 300px; flex-basis: 380px; flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;}
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.calendar-header button { background-color: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+.calendar-header button:hover { background-color: #0056b3; }
+.calendar-header #monthYearDisplay { font-size: 1.2em; font-weight: bold; }
+.calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.calendar-table th, .calendar-table td { text-align: center; border: 1px solid #eee; }
+.calendar-table th { background-color: #f8f9fa; font-size: 0.9em; padding: 8px 0; }
+.calendar-table td { 
+    cursor: pointer; 
+    height: 75px; /* Increased height slightly more for titles */ 
+    vertical-align: top; 
+    font-size:0.9em; 
+    position: relative; 
+    padding: 0; /* Remove direct padding on td */
+}
+.calendar-table td:hover { background-color: #e9ecef; }
+.calendar-table td.today { background-color: #fff3cd; }
+.calendar-table td.today .calendar-day-number { font-weight: bold; }
+.calendar-table td.selected-day { background-color: #007bff !important; color: white !important; }
+.calendar-table td.selected-day .calendar-day-number { font-weight: bold; color: white; }
+.calendar-table td.other-month .calendar-day-number { color: #aaa; }
+.calendar-table td.other-month .calendar-day-event-title { display:none; }
+
+.calendar-day-content { /* Div inside TD for padding and flex layout */
+    padding: 4px; /* Padding for content within the cell */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center day number */
+    box-sizing: border-box;
+}
+.calendar-day-number {
+    font-weight: bold;
+    display: block; /* Make it block to control its own line */
+    margin-bottom: 2px; 
+}
+.calendar-table td.has-meeting .calendar-day-number::after { /* Dot indicator for days with meetings */
+    content: '●';
+    display: inline-block; /* Or block if on new line */
+    font-size: 0.7em;
+    color: #007bff;
+    margin-left: 3px; /* Space from number */
+}
+.calendar-table td.selected-day.has-meeting .calendar-day-number::after {
+    color: white;
+}
+
+.calendar-day-event-title {
+    font-size: 0.70em; 
+    color: #0069d9;    
+    background-color: #e7f3ff; 
+    padding: 1px 3px;
+    margin-top: 1px;
+    border-radius: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 95%; /* Take most of cell content width */
+    text-align: left;
+    box-sizing: border-box;
+    line-height: 1.3;
+}
+.calendar-table td.selected-day .calendar-day-event-title {
+    color: #0056b3; /* Darker blue text on selected day's event */
+    background-color: #b8daff; /* Lighter blue background for event on selected day */
+}
+.calendar-table td.today .calendar-day-event-title {
+     background-color: #ffeeba; 
+     color: #856404;
+}
+
+/* Panel Styles (Ensure these are from your last complete version) */
+/* ... (Keep your existing #meetingDetailsPanel, #meetingsListForDate, etc. styles) ... */
+#meetingDetailsPanel { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; min-height: 200px; }
+@media (min-width: 768px) { #meetingDetailsPanel { margin-top: 0; flex-basis: 550px; flex-grow: 2; } }
+#meetingDetailsPanel h3, #meetingDetailsPanel h4 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+#meetingDetailsPanel h4 { font-size: 1.1em; color: #333; }
+#meetingsListForDate, #selectedMeetingContent { list-style-type: none; padding-left: 0; }
+#meetingsListForDate li { padding: 10px; border: 1px solid #eee; margin-bottom: 8px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+#meetingsListForDate li:hover { background-color: #e9ecef; }
+#meetingsListForDate li.selected-meeting-item { background-color: #d1e7dd; border-left: 4px solid #28a745;}
+.meeting-time { font-size: 0.9em; color: #555; margin-left: 10px;}
+.no-meetings-message { color: #777; font-style: italic; padding: 10px; }
+#selectedMeetingContent .section { margin-bottom: 15px; }
+#selectedMeetingContent .preserve-whitespace { white-space: pre-wrap; background-color: #f8f9fa; padding:10px; border-radius:3px; font-size:0.95em; max-height: 200px; overflow-y: auto; border: 1px solid #eee;}
+#selectedMeetingContent table { font-size: 0.9em; }
+#selectedMeetingContent ul { padding-left: 20px; }
+.status-inline { padding: 2px 6px; font-size: 0.75em !important; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+.status-decision-open { background-color: #ffc107; color: #212529; }
+.status-decision-implemented { background-color: #28a745; color: white; }
