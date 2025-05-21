@@ -45,16 +45,17 @@ Visit http://localhost:5001 in your browser.
 ## Folder Structure
 
 ai-meeting-summarizer/
-├── app.py                  # Main Flask app
-├── database.py             # DB setup & schema
-├── transcription.py        # Whisper-based audio transcription
-├── nlp_processor.py        # Summary, action item, decision extractor
-├── templates/              # HTML files (Jinja2)
-├── static/                 # CSS, JS, Icons
-├── uploads/                # Audio uploads
-├── .env                    # Your OpenAI API key
-├── requirements.txt        # Project dependencies
-└── README.md               # Project documentation
+├── app.py                # Main Flask application
+├── database.py           # SQLite DB setup and schema
+├── transcription.py      # Whisper-based audio transcription
+├── nlp_processor.py      # NLP: summary, action items, decisions
+├── templates/            # HTML (Jinja2 templates)
+├── static/               # CSS, JS, icons
+├── uploads/              # Uploaded audio files
+├── .env                  # OpenAI API key (not tracked in Git)
+├── requirements.txt      # Python dependencies
+└── README.md             # Project documentation
+
 
 ## NLP Components (via OpenAI)
 
