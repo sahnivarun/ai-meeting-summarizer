@@ -93,8 +93,11 @@ def generate_summary(transcript: str) -> str:
         return "ERROR: Transcript is empty, cannot generate summary."
 
     prompt = f"""
-    Please provide a concise summary of the following meeting transcript.
-    Focus on the key topics discussed and main outcomes.
+    You are an expert meeting summarizer. Analyze the following transcript and generate a clean, concise summary.
+    Focus on the key topics discussed, decisions made, and outcomes agreed upon.
+
+    Avoid irrelevant small talk or greetings. Present the summary in 4–8 bullet points if possible.
+    This summary will be used in a dashboard for team tracking, so be objective and informative.
 
     Transcript:
     ---
@@ -103,6 +106,7 @@ def generate_summary(transcript: str) -> str:
 
     Summary:
     """
+
     system_message = "You are an expert meeting summarizer."
     logger.info("Requesting summary generation from LLM.")
     summary_response = get_llm_response("Summary Generation", prompt, system_message)
@@ -120,19 +124,24 @@ def extract_action_items(transcript: str) -> list:
         return [] # Return empty list if transcript is empty
 
     prompt = f"""
-    Analyze the following meeting transcript and extract all action items.
-    For each action item, identify the task, the assigned owner (if mentioned), and any due date (if mentioned).
-    Present the output as a JSON list of objects. Each object should have 'task', 'owner', and 'due_date' keys.
-    If an owner or due date is not mentioned, use null or an empty string for that field.
+    You are a smart assistant extracting action items from a meeting transcript.
+    Identify **all** action items clearly discussed or implied. For each item, return a JSON object with:
+    - `task`: the task or follow-up action
+    - `owner`: person responsible (null or "" if not mentioned)
+    - `due_date`: deadline or timeline (null or "N/A" if not mentioned)
 
-    Example for one action item:
+    Respond ONLY in a valid JSON list of objects like this:
+
+    [
     {{
         "task": "Prepare the quarterly report",
         "owner": "Alice",
         "due_date": "Next Friday"
-    }}
+    }},
+    ...
+    ]
 
-    If no action items are found, return an empty list [].
+    If no action items are present, return an empty list `[]`.
 
     Transcript:
     ---
@@ -141,6 +150,7 @@ def extract_action_items(transcript: str) -> list:
 
     JSON Output:
     """
+
     system_message = "You are an intelligent assistant skilled at extracting structured information like action items from text."
     logger.info("Requesting action item extraction from LLM.")
     response_text = get_llm_response("Action Item Extraction", prompt, system_message)
@@ -189,22 +199,27 @@ def extract_decisions(transcript: str) -> list:
         return []
 
     prompt = f"""
-    Analyze the following meeting transcript and extract key decisions made.
-    Present the output as a JSON list of strings, where each string is a decision.
-    If no decisions are found, return an empty list [].
+    You are a structured-thinking assistant. From this meeting transcript, extract **all decisions** made by the participants.
 
-    Example:
+    Format your output as a JSON array of plain English strings, each summarizing one decision.
+    Do not include tasks or suggestions unless they were explicitly agreed as decisions.
+
+    Examples:
     [
-        "The team will adopt the new software by Q3.",
-        "Project Alpha budget is approved."
+    "The team will migrate to the new CRM system in Q2.",
+    "Budget for Project Alpha has been approved."
     ]
+
+    If no decisions are found, return `[]`.
 
     Transcript:
     ---
     {transcript}
     ---
+
     JSON Output:
     """
+
     system_message = "You are an intelligent assistant skilled at extracting structured information like decisions from text."
     logger.info("Requesting decision extraction from LLM.")
     response_text = get_llm_response("Decision Extraction", prompt, system_message)

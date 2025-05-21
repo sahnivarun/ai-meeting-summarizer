@@ -94,16 +94,7 @@ def process_audio_file(filepath, actual_stored_filename, user_provided_title=Non
         nlp_error_occurred = summary_result.startswith("ERROR:")
         
         current_db_status = 'error' if nlp_error_occurred else 'completed'
-        
-        # **MODIFICATION: Remove or comment out the logic that updates final_meeting_title from summary**
-        # was_generated_title = f"({current_dt_str})" in final_meeting_title 
-        # if was_generated_title and not nlp_error_occurred and summary_result and not summary_result.startswith("ERROR:") and len(summary_result) > 5:
-        #     potential_title = " ".join(summary_result.split()[:6]) 
-        #     if len(potential_title) > 5: 
-        #         final_meeting_title = potential_title + "..." 
-        #         logger.info(f"Updated meeting_title for ID {meeting_id} from summary to: '{final_meeting_title}'")
-        # **END MODIFICATION**
-        
+               
         # The final_meeting_title is now either user-provided or the "Mode (timestamp)" default.
         cursor.execute("UPDATE meetings SET summary = ?, processing_status = ?, meeting_title = ? WHERE id = ?", 
                        (summary_result, current_db_status, final_meeting_title, meeting_id))
@@ -163,15 +154,6 @@ def process_text_input(transcript_text, user_provided_title=None):
         decisions_from_nlp = extract_decisions(transcript_text) 
         nlp_error_occurred = summary_result.startswith("ERROR:")
         current_db_status = 'error' if nlp_error_occurred else 'completed'
-        
-        # **MODIFICATION: Remove or comment out the logic that updates final_meeting_title from summary**
-        # was_generated_title = f"({current_dt_str})" in final_meeting_title 
-        # if was_generated_title and not nlp_error_occurred and summary_result and not summary_result.startswith("ERROR:") and len(summary_result) > 5:
-        #     potential_title = " ".join(summary_result.split()[:6]) 
-        #     if len(potential_title) > 5: 
-        #         final_meeting_title = potential_title + "..." 
-        #         logger.info(f"TEXT_PROC: Auto-updated meeting_title for ID {meeting_id} from summary to: '{final_meeting_title}'")
-        # **END MODIFICATION**
         
         cursor.execute("UPDATE meetings SET summary = ?, processing_status = ?, meeting_title = ? WHERE id = ?", 
                        (summary_result, current_db_status, final_meeting_title, meeting_id)) # Use the already set final_meeting_title

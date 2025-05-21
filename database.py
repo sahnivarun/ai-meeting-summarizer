@@ -63,10 +63,6 @@ def init_db():
     _add_column_if_not_exists(cursor, "meetings", "end_datetime", "TIMESTAMP")
     _add_column_if_not_exists(cursor, "meetings", "agenda", "TEXT")
     _add_column_if_not_exists(cursor, "meetings", "attendees", "TEXT")
-    # If 'filename' was previously NOT NULL and you need to change it:
-    # This is complex with existing data and SQLite. Easiest is to recreate table if possible,
-    # or handle filename as non-NULL in app.py by always providing a placeholder for text inputs.
-    # The CREATE TABLE above makes it nullable.
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS action_items (
