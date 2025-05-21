@@ -81,7 +81,7 @@ Max file size: 100MB
 
 ### Example Video
 
-You can view a demo of the working project here: 📺 Click to watch
+You can view a demo of the working project here: https://drive.google.com/file/d/1amasXuICtkUcHmBtqc1vCJg5wN3tXwyn/view?usp=drive_link
 
 ## Contributing
 
