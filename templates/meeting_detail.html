@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Details - {{ meeting.filename }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('index') }}" class="button back-button">« Back to Dashboard</a>
+        <h1>Meeting Details: {{ meeting.filename }}</h1>
+        <p><strong>Uploaded:</strong> {{ meeting.upload_time.strftime('%Y-%m-%d %H:%M') if meeting.upload_time else 'N/A' }}</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="section">
+            <h2>Summary</h2>
+            <p class="preserve-whitespace">{{ meeting.summary if meeting.summary else "No summary available." }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Action Items</h2>
+            {% if action_items %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Owner</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Toggle Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in action_items %}
+                    <tr>
+                        <td>{{ item.task }}</td>
+                        <td>{{ item.owner if item.owner else 'N/A' }}</td>
+                        <td>{{ item.due_date if item.due_date else 'N/A' }}</td>
+                        <td>
+                            <span class="status status-{{ item.status }}">{{ item.status }}</span>
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('toggle_action_item_status', item_id=item.id) }}" style="display: inline;">
+                                <button type="submit" class="button-small">
+                                    Mark as {{ 'Pending' if item.status == 'completed' else 'Completed' }}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{{ url_for('download_calendar_file', meeting_id=meeting.id) }}" class="button">Download Pending Actions (.ics)</a>
+            {% else %}
+            <p>No action items identified.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h2>Decisions</h2>
+            {% if decisions %}
+            <ul>
+                {% for decision in decisions %}
+                <li>{{ decision.decision_text }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No decisions identified.</p>
+            {% endif %}
+        </div>
+        
+        <div class="section">
+            <h2>Full Transcript</h2>
+            <details>
+                <summary>Click to view/hide transcript</summary>
+                <textarea readonly class="transcript-area">{{ meeting.transcript if meeting.transcript else "Transcript not available or processing failed." }}</textarea>
+            </details>
+        </div>
+
+    </div>
+</body>
+</html>

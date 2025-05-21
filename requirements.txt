@@ -1,0 +1,6 @@
+Flask==2.3.3
+openai==1.3.3  # Or newer compatible version for GPT API
+openai-whisper==20231117 # For local transcription
+python-dotenv==1.0.0
+ics==0.7.2 # For generating .ics calendar files
+ffmpeg-python # Whisper might need ffmpeg for audio conversion

@@ -1,0 +1,15 @@
+# virtual environment
+venv/
+__pycache__/
+
+# secrets
+.env
+
+# runtime files
+uploads/
+meetings.db
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Meeting Summarizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Meeting Summarizer</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h2>Upload New Meeting Audio</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="audio_file" accept=".mp3,.wav,.m4a,.mp4,.ogg,.flac" required>
+            <button type="submit">Upload and Process</button>
+        </form>
+        <p><small>Supported formats: mp3, wav, m4a, mp4, ogg, flac. Max size: 50MB.</small></p>
+        <p><small>Processing can take time, especially for long audio files.</small></p>
+
+        <h2>Processed Meetings</h2>
+        {% if meetings %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Uploaded At</th>
+                    <th>Status</th>
+                    <th>Summary Snippet</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for meeting in meetings %}
+                <tr>
+                    <td>{{ meeting.filename }}</td>
+                    <td>{{ meeting.upload_time.strftime('%Y-%m-%d %H:%M') if meeting.upload_time else 'N/A' }}</td>
+                    <td>
+                        <span class="status status-{{ meeting.processing_status.replace(' ', '-') }}">{{ meeting.processing_status }}</span>
+                    </td>
+                    <td>{{ (meeting.summary[:100] + '...') if meeting.summary and meeting.summary|length > 100 else meeting.summary }}</td>
+                    <td>
+                        {% if meeting.processing_status == 'completed' %}
+                            <a href="{{ url_for('meeting_detail', meeting_id=meeting.id) }}" class="button">View Details</a>
+                        {% elif meeting.processing_status == 'error' %}
+                            <span>Error</span>
+                        {% else %}
+                            <span>Processing...</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No meetings processed yet.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
