@@ -86,12 +86,12 @@ Max file size: 100MB
 
 ## Sample Flow
 
-*Upload/record meeting or paste transcript
-*Transcription → NLP summary → action items/decisions
-*Results saved to DB (SQLite)
-*View all meetings via dashboard/calendar
-*Track pending items & update statuses
-*Export .ics for calendar import
+* Upload/record meeting or paste transcript
+* Transcription → NLP summary → action items/decisions
+* Results saved to DB (SQLite)
+* View all meetings via dashboard/calendar
+* Track pending items & update statuses
+* Export .ics for calendar import
 
 ### Example Video
 
@@ -103,13 +103,13 @@ PRs are welcome! If you'd like to improve UI/UX, error handling, or extend NLP m
 
 ## Tech Stack
 
-*Python + Flask
-*Whisper (OpenAI)
-*ChatGPT (OpenAI API)
-*SQLite3
-*HTML + Jinja2
-*JavaScript (vanilla + DOM APIs)
-*CSS (custom, no external framework)
+* Python + Flask
+* Whisper (OpenAI)
+* ChatGPT (OpenAI API)
+* SQLite3
+* HTML + Jinja2
+* JavaScript (vanilla + DOM APIs)
+* CSS (custom, no external framework)
 
 ## Contact
 
